@@ -1,0 +1,448 @@
+import "@typespec/http";
+import "@typespec/rest";
+import "@typespec/openapi3";
+
+using TypeSpec.Http;
+using TypeSpec.Rest;
+using TypeSpec.OpenAPI;
+
+/**
+ * Calendar Booking API
+ *
+ * Simplified booking system inspired by Cal.com
+ * Two roles: calendar owner (single static profile) and guests (book without registration)
+ * All times are in UTC, client handles timezone conversion
+ */
+@service
+@server("https://api.example.com", "Production server")
+namespace CalendarBooking;
+
+// ============================================================================
+// Base models
+// ============================================================================
+
+/**
+ * Enum for days of the week
+ */
+enum DayOfWeek {
+  mon: "mon",
+  tue: "tue",
+  wed: "wed",
+  thu: "thu",
+  fri: "fri",
+  sat: "sat",
+  sun: "sun"
+}
+
+/**
+ * Working hours configuration
+ */
+model WorkingHours {
+  @pattern("^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
+  startTime: string;
+
+  @pattern("^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
+  endTime: string;
+
+  /** Unique working days (no duplicates allowed) */
+  workingDays: DayOfWeek[];
+
+  /** Exceptions from standard working hours (vacations, days off) */
+  exceptions: WorkingHoursException[];
+}
+
+/**
+ * Exception from working hours schedule
+ * Admin manages these - only future dates, no bookings in range allowed
+ */
+model WorkingHoursException {
+  @key
+  id: string;
+
+  /** Exception period start (datetime in UTC) */
+  startDateTime: utcDateTime;
+
+  /** Exception period end (datetime in UTC) */
+  endDateTime: utcDateTime;
+}
+
+/**
+ * Calendar owner profile (static, single owner)
+ */
+model Owner {
+  @format("email")
+  email: string;
+
+  description?: string;
+
+  workingHours: WorkingHours;
+}
+
+/**
+ * Event type = duration choice (30min, 60min, etc.)
+ */
+model EventType {
+  @key
+  id: string;
+
+  @minLength(1)
+  @maxLength(200)
+  title: string;
+
+  @minValue(15)
+  @maxValue(480)
+  durationMinutes: int32;
+}
+
+/**
+ * Guest information for booking
+ */
+model Guest {
+  @minLength(1)
+  @maxLength(100)
+  name: string;
+
+  @format("email")
+  email: string;
+}
+
+/**
+ * Booking record (always confirmed once created)
+ */
+model Booking {
+  @key
+  id: string;
+
+  eventTypeId: string;
+
+  /** Computed: startTime + event duration */
+  endTime: utcDateTime;
+
+  guest: Guest;
+
+  startTime: utcDateTime;
+}
+
+/**
+ * Available slot for booking (only available slots are returned)
+ */
+model AvailableSlot {
+  startTime: utcDateTime;
+
+  endTime: utcDateTime;
+}
+
+// ============================================================================
+// Request/response models
+// ============================================================================
+
+/**
+ * Create event type request
+ */
+model CreateEventTypeRequest {
+  @minLength(1)
+  @maxLength(200)
+  title: string;
+
+  @minValue(15)
+  @maxValue(480)
+  durationMinutes: int32;
+}
+
+/**
+ * Update event type request
+ */
+model UpdateEventTypeRequest {
+  @minLength(1)
+  @maxLength(200)
+  title?: string;
+
+  @minValue(15)
+  @maxValue(480)
+  durationMinutes?: int32;
+}
+
+/**
+ * Create booking request
+ */
+model CreateBookingRequest {
+  eventTypeId: string;
+
+  startTime: utcDateTime;
+
+  guest: Guest;
+}
+
+/**
+ * Get available slots parameters
+ */
+model GetAvailableSlotsParams {
+  @query
+  startDate: plainDate;
+
+  @query
+  endDate: plainDate;
+}
+
+/**
+ * Booking list response (no pagination)
+ */
+model BookingListResponse {
+  bookings: Booking[];
+}
+
+/**
+ * Event type list response (no pagination)
+ */
+model EventTypeListResponse {
+  eventTypes: EventType[];
+}
+
+/**
+ * Available slots response
+ */
+model AvailableSlotsResponse {
+  slots: AvailableSlot[];
+}
+
+/**
+ * Update working hours request
+ */
+model UpdateWorkingHoursRequest {
+  workingHours: WorkingHours;
+}
+
+// ============================================================================
+// Error models
+// ============================================================================
+
+/**
+ * Standard error response
+ */
+@error
+model ErrorResponse {
+  code: "NOT_FOUND" | "VALIDATION_ERROR" | "CONFLICT" | "BUSINESS_RULE";
+  message: string;
+  details?: string[];
+}
+
+// ============================================================================
+// API Endpoints - Admin (for calendar owner)
+// ============================================================================
+
+@route("/api/admin")
+@tag("Admin - Event Types")
+interface AdminEventTypes {
+  @post
+  @route("/event-types")
+  @summary("Create event type")
+  createEventType(@body request: CreateEventTypeRequest): {
+    @statusCode statusCode: 201;
+    @body eventType: EventType;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  };
+
+  @get
+  @route("/event-types")
+  @summary("List all event types")
+  listEventTypes(): {
+    @statusCode statusCode: 200;
+    @body response: EventTypeListResponse;
+  };
+
+  @put
+  @route("/event-types/{id}")
+  @summary("Update event type")
+  updateEventType(
+    @path id: string,
+    @body request: UpdateEventTypeRequest
+  ): {
+    @statusCode statusCode: 200;
+    @body eventType: EventType;
+  } | {
+    @statusCode statusCode: 404;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  };
+
+  @delete
+  @route("/event-types/{id}")
+  @summary("Delete event type")
+  deleteEventType(@path id: string): {
+    @statusCode statusCode: 204;
+  } | {
+    @statusCode statusCode: 404;
+    @body error: ErrorResponse;
+  };
+}
+
+@route("/api/admin")
+@tag("Admin - Bookings")
+interface AdminBookings {
+  @get
+  @route("/bookings")
+  @summary("List all bookings (sorted by start time)")
+  listBookings(): {
+    @statusCode statusCode: 200;
+    @body response: BookingListResponse;
+  };
+}
+
+@route("/api/admin")
+@tag("Admin - Working Hours")
+interface AdminWorkingHours {
+  @get
+  @route("/owner")
+  @summary("Get owner profile")
+  getOwner(): {
+    @statusCode statusCode: 200;
+    @body owner: Owner;
+  };
+
+  @put
+  @route("/owner")
+  @summary("Update owner working hours")
+  updateOwner(@body request: UpdateWorkingHoursRequest): {
+    @statusCode statusCode: 200;
+    @body owner: Owner;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  };
+
+  @post
+  @route("/owner/exceptions")
+  @summary("Create working hours exception (future dates only, no bookings in range)")
+  createException(@body exception: WorkingHoursException): {
+    @statusCode statusCode: 201;
+    @body exception: WorkingHoursException;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 409;
+    @body error: ErrorResponse;
+  };
+
+  @get
+  @route("/owner/exceptions")
+  @summary("List all exceptions")
+  listExceptions(): {
+    @statusCode statusCode: 200;
+    @body exceptions: WorkingHoursException[];
+  };
+
+  @put
+  @route("/owner/exceptions/{id}")
+  @summary("Update exception (future dates only, no bookings in range)")
+  updateException(
+    @path id: string,
+    @body exception: WorkingHoursException
+  ): {
+    @statusCode statusCode: 200;
+    @body exception: WorkingHoursException;
+  } | {
+    @statusCode statusCode: 404;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 409;
+    @body error: ErrorResponse;
+  };
+
+  @delete
+  @route("/owner/exceptions/{id}")
+  @summary("Delete exception (future dates only, no bookings in range)")
+  deleteException(@path id: string): {
+    @statusCode statusCode: 204;
+  } | {
+    @statusCode statusCode: 404;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 409;
+    @body error: ErrorResponse;
+  };
+}
+
+// ============================================================================
+// API Endpoints - Public (for guests)
+// ============================================================================
+
+@route("/api")
+@tag("Public - Event Types")
+interface PublicEventTypes {
+  @get
+  @route("/event-types")
+  @summary("List available event types")
+  listPublicEventTypes(): {
+    @statusCode statusCode: 200;
+    @body response: EventTypeListResponse;
+  };
+
+  @get
+  @route("/event-types/{id}")
+  @summary("Get event type details")
+  getPublicEventType(@path id: string): {
+    @statusCode statusCode: 200;
+    @body eventType: EventType;
+  } | {
+    @statusCode statusCode: 404;
+    @body error: ErrorResponse;
+  };
+
+  @get
+  @route("/event-types/{id}/available-slots")
+  @summary("Get available slots for event type (all times in UTC)")
+  getAvailableSlots(
+    @path id: string,
+    @query startDate: plainDate,
+    @query endDate: plainDate
+  ): {
+    @statusCode statusCode: 200;
+    @body response: AvailableSlotsResponse;
+  } | {
+    @statusCode statusCode: 404;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  };
+}
+
+@route("/api")
+@tag("Public - Bookings")
+interface PublicBookings {
+  /**
+   * Create booking
+   * Rules:
+   * - Slot must be free (no overlaps)
+   * - Time must be within owner's working hours + exceptions
+   * - Start time must be in the future
+   * - Max booking date: 3 months from now
+   */
+  @post
+  @route("/bookings")
+  @summary("Create booking")
+  createBooking(@body request: CreateBookingRequest): {
+    @statusCode statusCode: 201;
+    @body booking: Booking;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 404;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 409;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 422;
+    @body error: ErrorResponse;
+  };
+}
