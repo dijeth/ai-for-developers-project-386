@@ -1,0 +1,12 @@
+{
+  "name": "contracts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "mock": "prism mock openapi.yaml -p 4010",
+    "dev": "prism mock openapi.yaml -p 4010"
+  },
+  "devDependencies": {
+    "@stoplight/prism-cli": "^5.14.2"
+  }
+}

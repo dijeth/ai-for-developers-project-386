@@ -1,20 +1,19 @@
 {
   "name": "ai-for-developers-project-386",
   "version": "1.0.0",
-  "description": "[![Actions Status](https://github.com/dijeth/ai-for-developers-project-386/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/dijeth/ai-for-developers-project-386/actions)",
-  "main": "index.js",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "tsp:compile": "tsp compile .",
-    "tsp:watch": "tsp compile . --watch"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
-    "@typespec/compiler": "^1.10.0",
-    "@typespec/http": "^1.10.0",
-    "@typespec/openapi3": "^1.10.0",
-    "@typespec/rest": "^0.80.0"
-  }
+    "turbo": "^2.0.0"
+  },
+  "packageManager": "npm@10.0.0"
 }
