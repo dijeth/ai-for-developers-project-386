@@ -37,6 +37,7 @@ npm run typecheck
 ## Build Pipeline (Turbo)
 
 Order matters:
+
 1. `tsp:compile` (packages/api-spec) → generates `packages/contracts/openapi.yaml`
 2. `build` depends on `^tsp:compile` (upstream completion)
 
@@ -45,17 +46,20 @@ Order matters:
 ## Package Details
 
 ### packages/api-spec
+
 - **Entry**: `main.tsp`
 - **Output**: `../contracts/openapi.yaml` (configured in `tspconfig.yaml`)
 - **Commands**: `npm run build` (once), `npm run watch` / `npm run dev` (watch mode)
 
 ### packages/contracts
+
 - **Generated**: `openapi.yaml` (OpenAPI 3.1.0)
 - **Commands**:
   - `npm run mock` - Prism mock server on port 4010
   - `npm run dev` - Prism **proxy** mode (forwards to localhost:3001) with error simulation
 
 ### apps/web
+
 - **Framework**: Vue 3 (Composition API, `<script setup>`)
 - **UI**: PrimeVue with Lara Light Blue theme (copied to `public/themes/` via `postinstall`)
 - **Proxy**: `/api` → `http://localhost:4010` (vite.config.ts)
@@ -65,6 +69,7 @@ Order matters:
   - `npm run copy-themes` - copies PrimeVue themes to public/
 
 ### apps/api
+
 - **Framework**: NestJS with Prisma ORM
 - **Commands**:
   - `npm run dev` - NestJS watch mode on port 3001
@@ -100,3 +105,7 @@ Order matters:
 
 - Comments: Write only in English
 - CSS: Avoid `!important`, use CSS variables instead
+
+## Other Notes
+
+- Write in Russian in the chat, but code and comments in English
