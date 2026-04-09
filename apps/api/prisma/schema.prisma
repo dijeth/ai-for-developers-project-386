@@ -8,7 +8,7 @@ datasource db {
 }
 
 // ============================================================================
-// Owner (Владелец календаря) - singleton
+// Owner (Calendar owner) - singleton
 // ============================================================================
 
 model Owner {
@@ -17,14 +17,14 @@ model Owner {
   email              String
   description        String?
   avatar             String?
-  bookingMonthsAhead Int      @default(3) // 1-12 месяцев
+  bookingMonthsAhead Int      @default(3) // 1-12 months
 
-  // WorkingHours встроены в Owner (не отдельная таблица)
-  workingHoursStart  String   @default("09:00") // формат HH:MM
-  workingHoursEnd    String   @default("17:00") // формат HH:MM
-  workingDays        String   @default("[\"mon\",\"tue\",\"wed\",\"thu\",\"fri\"]") // JSON массив DayOfWeek
+  // WorkingHours are embedded in Owner (not a separate table)
+  workingHoursStart  String   @default("09:00") // format HH:MM
+  workingHoursEnd    String   @default("17:00") // format HH:MM
+  workingDays        String   @default("[\"mon\",\"tue\",\"wed\",\"thu\",\"fri\"]") // JSON array of DayOfWeek
 
-  // Связь с TimeOff (один-ко-многим)
+  // Relation to TimeOff (one-to-many)
   timeOffs           TimeOff[]
 
   createdAt          DateTime @default(now())
@@ -32,7 +32,7 @@ model Owner {
 }
 
 // ============================================================================
-// TimeOff (Выходные/отпуска)
+// TimeOff (Days off/vacations)
 // ============================================================================
 
 model TimeOff {
@@ -40,7 +40,7 @@ model TimeOff {
   startDateTime DateTime
   endDateTime   DateTime
 
-  // Связь с Owner
+  // Relation to Owner
   owner         Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId       String   @default("owner")
 
@@ -51,15 +51,15 @@ model TimeOff {
 }
 
 // ============================================================================
-// EventType (Типы событий - 30 мин, 60 мин, и т.д.)
+// EventType (Event types - 30 min, 60 min, etc.)
 // ============================================================================
 
 model EventType {
   id              String    @id @default(cuid())
   title           String
-  durationMinutes Int       // 15-480 минут
+  durationMinutes Int       // 15-480 minutes
 
-  // Связь с Booking
+  // Relation to Booking
   bookings        Booking[]
 
   createdAt       DateTime  @default(now())
@@ -67,26 +67,26 @@ model EventType {
 }
 
 // ============================================================================
-// Booking (Бронирования)
+// Booking (Bookings)
 // ============================================================================
 
 model Booking {
   id          String   @id @default(cuid())
   startTime   DateTime
-  endTime     DateTime // вычисляется на основе EventType.durationMinutes
+  endTime     DateTime // calculated based on EventType.durationMinutes
 
-  // Guest встроен в Booking (не отдельная таблица)
+  // Guest is embedded in Booking (not a separate table)
   guestName   String
   guestEmail  String
 
-  // Связь с EventType (Restrict - запретить удаление EventType при наличии бронирований)
+  // Relation to EventType (Restrict - prevent deleting EventType if bookings exist)
   eventType   EventType @relation(fields: [eventTypeId], references: [id], onDelete: Restrict)
   eventTypeId String
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  // Индекс для быстрого поиска по времени (для проверки пересечений)
+  // Index for fast search by time (for overlap checking)
   @@index([startTime, endTime])
   @@index([guestEmail])
 }

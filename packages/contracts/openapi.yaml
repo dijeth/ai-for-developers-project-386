@@ -19,8 +19,30 @@ paths:
   /api/admin/bookings:
     get:
       operationId: AdminBookings_listBookings
-      summary: List all bookings (sorted by start time)
-      parameters: []
+      summary: List bookings (sorted by start time). Filter by date range using dateFrom/dateTo query params.
+      parameters:
+        - name: dateFrom
+          in: query
+          required: false
+          description: Filter bookings from this date (inclusive, UTC)
+          schema:
+            type: string
+            format: date-time
+          explode: false
+        - name: dateTo
+          in: query
+          required: false
+          description: Filter bookings until this date (inclusive, UTC)
+          schema:
+            type: string
+            format: date-time
+          explode: false
+        - name: params
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ListBookingsParams'
+          explode: false
       responses:
         '200':
           description: The request has succeeded.
@@ -28,6 +50,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BookingListResponse'
+      tags:
+        - Admin - Bookings
+  /api/admin/bookings/{id}:
+    delete:
+      operationId: AdminBookings_deleteBooking
+      summary: Cancel/delete a booking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 'There is no content to send for this request, but the headers may be useful. '
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       tags:
         - Admin - Bookings
   /api/admin/event-types:
@@ -620,6 +669,9 @@ components:
           type: string
           format: email
       description: Guest information for booking
+    ListBookingsParams:
+      type: object
+      description: Parameters for filtering bookings by date range
     Owner:
       type: object
       required:

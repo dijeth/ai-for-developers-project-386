@@ -1,5 +1,9 @@
 import { ref, computed } from 'vue';
 import type { EventType, AvailableSlot, PublicOwner, Booking, CreateBookingRequest } from '../types/booking';
+import {
+  formatTimeRange,
+  addMonths
+} from '../utils/date.utils';
 
 const API_BASE_URL = '/api';
 
@@ -90,9 +94,7 @@ export function useOwner() {
   const maxBookingDate = computed(() => {
     if (!owner.value) return null;
     const months = owner.value.bookingMonthsAhead ?? 3;
-    const maxDate = new Date();
-    maxDate.setMonth(maxDate.getMonth() + months);
-    return maxDate;
+    return addMonths(new Date(), months);
   });
 
   return {
@@ -142,29 +144,14 @@ export function useCreateBooking() {
   };
 }
 
+// Re-export for backward compatibility
+export { toUTCDateString } from '../utils/date.utils';
+export { formatLongDate as formatDate } from '../utils/date.utils';
+
+/**
+ * Formats an available slot as time range for display.
+ * Uses local timezone for display.
+ */
 export function formatSlotTime(slot: AvailableSlot): string {
-  const start = new Date(slot.startTime);
-  const end = new Date(slot.endTime);
-  return `${formatTime(start)} - ${formatTime(end)}`;
-}
-
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-}
-
-export function formatDate(date: Date): string {
-  return date.toLocaleDateString('ru-RU', { 
-    weekday: 'long', 
-    day: 'numeric', 
-    month: 'long' 
-  });
-}
-
-export function toUTCDateString(date: Date): string {
-  // Return UTC datetime with time set to 00:00:00
-  // This ensures no timezone confusion between frontend and backend
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}T00:00:00.000Z`;
+  return formatTimeRange(slot.startTime, slot.endTime);
 }

@@ -10,6 +10,7 @@ import { OwnerService } from '../../prisma/models/owner.service';
 import { CreateBookingDto } from '../../dto/booking/create-booking.dto';
 import { BookingDto } from '../../dto/booking/booking.dto';
 import { AvailableSlotsService } from './available-slots.service';
+import { fromISO, utcNow, startOfUTCDay, isUTCBefore } from '../../common/utils/date.utils';
 
 @Injectable()
 export class PublicBookingApiService {
@@ -30,14 +31,14 @@ export class PublicBookingApiService {
     }
 
     // Parse start time
-    const startTime = new Date(dto.startTime);
+    const startTime = fromISO(dto.startTime);
     if (isNaN(startTime.getTime())) {
       throw new UnprocessableEntityException('Invalid start time format');
     }
 
     // Check start time is in the future
-    const now = new Date();
-    if (startTime <= now) {
+    const now = utcNow();
+    if (isUTCBefore(startTime, now) || startTime.getTime() === now.getTime()) {
       throw new UnprocessableEntityException('Start time must be in the future');
     }
 
@@ -65,8 +66,7 @@ export class PublicBookingApiService {
     endTime: Date,
   ): Promise<void> {
     // Get the day of the booking for slot query
-    const dayStart = new Date(startTime);
-    dayStart.setUTCHours(0, 0, 0, 0);
+    const dayStart = startOfUTCDay(startTime);
 
     // Get available slots for that day (pass as UTC datetime with 00:00:00)
     const availableSlots = await this.availableSlotsService.getAvailableSlots(

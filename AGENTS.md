@@ -101,6 +101,70 @@ Order matters:
 2. **Frontend changes**: Edit `apps/web/src/**/*.vue` → hot reload via Vite
 3. **Backend changes**: Edit `apps/api/src/` → NestJS on port 3001 (frontend accesses via Prism proxy on :4010)
 
+## Date/Time Handling (UTC-Only Policy)
+
+**IMPORTANT: Backend only works with UTC dates. Frontend handles local↔UTC conversion.**
+
+### Backend (apps/api)
+
+**File**: `src/common/utils/date.utils.ts`
+
+```typescript
+// Use these instead of native Date methods:
+utcNow()              // Instead of new Date()
+fromISO(string)        // Parse ISO string
+startOfUTCDay(date)    // 00:00:00 UTC
+endOfUTCDay(date)      // 23:59:59 UTC
+addUTCDays(date, n)    // Add days
+addUTCMonths(date, n)  // Add months
+formatUTCDate(date)    // YYYY-MM-DD
+formatUTCTime(date)    // HH:MM
+```
+
+**Rules:**
+1. Never use `new Date()` directly — always `utcNow()`
+2. Never use `.getHours()`, `.getDate()` — always `.getUTCHours()`, `.getUTCDate()`
+3. Never use `.setHours()`, `.setDate()` — always `.setUTCHours()`, `.setUTCDate()`
+4. All API responses use `.toISOString()` (guarantees UTC)
+
+### Frontend (apps/web)
+
+**File**: `src/utils/date.utils.ts`
+
+```typescript
+// For API calls (convert local→UTC):
+toUTCDateString(date)        // YYYY-MM-DDT00:00:00.000Z
+toUTCEndOfDayString(date)    // YYYY-MM-DDT23:59:59.999Z
+
+// For display (uses browser timezone):
+formatLocalDate(date)         // "пт, 9 апр"
+formatLocalTime(isoString)   // "14:30"
+formatTimeRange(start, end)  // "14:30 - 15:30"
+
+// For parsing:
+fromISO(isoString)            // Parse API date
+```
+
+**Rules:**
+1. Calendar shows local dates (PrimeVue Calendar uses browser TZ)
+2. API calls convert to UTC using `toUTCDateString()`
+3. Display functions use `toLocaleString()` for local formatting
+4. Never send bare `Date` objects to API — always convert to ISO string
+
+### Flow
+
+```
+User selects date in Calendar (local timezone)
+        ↓
+toUTCDateString() converts to UTC
+        ↓
+API call with UTC ISO string
+        ↓
+Backend processes in UTC, returns ISO strings
+        ↓
+formatLocalTime() converts to local for display
+```
+
 ## Style Notes
 
 - Comments: Write only in English

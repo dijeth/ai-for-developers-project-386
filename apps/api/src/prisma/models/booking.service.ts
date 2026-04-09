@@ -22,6 +22,28 @@ export class BookingService {
     });
   }
 
+  async findByDateRange(dateFrom?: Date, dateTo?: Date) {
+    const where: { startTime?: { gte?: Date; lte?: Date } } = {};
+    
+    if (dateFrom || dateTo) {
+      where.startTime = {};
+      if (dateFrom) {
+        where.startTime.gte = dateFrom;
+      }
+      if (dateTo) {
+        where.startTime.lte = dateTo;
+      }
+    }
+
+    return this.prisma.booking.findMany({
+      where: Object.keys(where).length > 0 ? where : undefined,
+      orderBy: { startTime: 'asc' },
+      include: {
+        eventType: true,
+      },
+    });
+  }
+
   async findInRange(start: Date, end: Date) {
     return this.prisma.booking.findMany({
       where: {
@@ -78,5 +100,23 @@ export class BookingService {
     });
 
     return count > 0;
+  }
+
+  async findById(id: string) {
+    return this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        eventType: true,
+      },
+    });
+  }
+
+  async delete(id: string) {
+    return this.prisma.booking.delete({
+      where: { id },
+      include: {
+        eventType: true,
+      },
+    });
   }
 }

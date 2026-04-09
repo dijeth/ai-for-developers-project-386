@@ -1,17 +1,36 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { BookingService } from '../../prisma/models/booking.service';
 import { BookingDto, BookingListResponseDto } from '../../dto/booking/booking.dto';
+
+interface ListBookingsFilter {
+  dateFrom?: Date;
+  dateTo?: Date;
+}
 
 @Injectable()
 export class BookingApiService {
   constructor(private bookingService: BookingService) {}
 
-  async listBookings(): Promise<BookingListResponseDto> {
-    const bookings = await this.bookingService.findAll();
+  async listBookings(filter?: ListBookingsFilter): Promise<BookingListResponseDto> {
+    let bookings;
+    
+    if (filter?.dateFrom || filter?.dateTo) {
+      bookings = await this.bookingService.findByDateRange(filter.dateFrom, filter.dateTo);
+    } else {
+      bookings = await this.bookingService.findAll();
+    }
 
     return {
       bookings: bookings.map((b) => this.mapToDto(b)),
     };
+  }
+
+  async deleteBooking(id: string): Promise<void> {
+    const booking = await this.bookingService.findById(id);
+    if (!booking) {
+      throw new NotFoundException(`Booking with id ${id} not found`);
+    }
+    await this.bookingService.delete(id);
   }
 
   private mapToDto(booking: {

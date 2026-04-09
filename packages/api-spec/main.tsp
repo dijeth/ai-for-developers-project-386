@@ -371,15 +371,41 @@ interface AdminEventTypes {
   };
 }
 
+/**
+ * Parameters for filtering bookings by date range
+ */
+model ListBookingsParams {
+  /** Filter bookings from this date (inclusive, UTC) */
+  @query
+  dateFrom?: utcDateTime;
+
+  /** Filter bookings until this date (inclusive, UTC) */
+  @query
+  dateTo?: utcDateTime;
+}
+
 @route("/api/admin")
 @tag("Admin - Bookings")
 interface AdminBookings {
   @get
   @route("/bookings")
-  @summary("List all bookings (sorted by start time)")
-  listBookings(): {
+  @summary("List bookings (sorted by start time). Filter by date range using dateFrom/dateTo query params.")
+  listBookings(@query params?: ListBookingsParams): {
     @statusCode statusCode: 200;
     @body response: BookingListResponse;
+  };
+
+  @delete
+  @route("/bookings/{id}")
+  @summary("Cancel/delete a booking")
+  deleteBooking(@path id: string): {
+    @statusCode statusCode: 204;
+  } | {
+    @statusCode statusCode: 404;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
   };
 }
 

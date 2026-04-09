@@ -12,6 +12,7 @@ import {
   UpdateTimeOffDto,
 } from '../../dto/owner/time-off-request.dto';
 import { TimeOffDto } from '../../dto/owner/time-off.dto';
+import { fromISO, utcNow, isUTCBefore, isUTCAfter } from '../../common/utils/date.utils';
 
 @Injectable()
 export class TimeOffApiService {
@@ -29,8 +30,8 @@ export class TimeOffApiService {
     ownerId: string,
     dto: CreateTimeOffDto,
   ): Promise<TimeOffDto> {
-    const startDate = new Date(dto.startDateTime);
-    const endDate = new Date(dto.endDateTime);
+    const startDate = fromISO(dto.startDateTime);
+    const endDate = fromISO(dto.endDateTime);
 
     // Validate: future dates only
     this.validateFutureDates(startDate, endDate);
@@ -61,10 +62,10 @@ export class TimeOffApiService {
     }
 
     const startDate = dto.startDateTime
-      ? new Date(dto.startDateTime)
+      ? fromISO(dto.startDateTime)
       : existing.startDateTime;
     const endDate = dto.endDateTime
-      ? new Date(dto.endDateTime)
+      ? fromISO(dto.endDateTime)
       : existing.endDateTime;
 
     // Validate: future dates only
@@ -92,7 +93,7 @@ export class TimeOffApiService {
     }
 
     // Validate: future dates only (can't delete past time-offs)
-    if (existing.endDateTime < new Date()) {
+    if (isUTCBefore(existing.endDateTime, utcNow())) {
       throw new ForbiddenException(
         'Cannot delete time-off that has already ended',
       );
@@ -113,17 +114,17 @@ export class TimeOffApiService {
   }
 
   private validateFutureDates(startDate: Date, endDate: Date): void {
-    const now = new Date();
+    const now = utcNow();
 
-    if (startDate < now) {
+    if (isUTCBefore(startDate, now) || startDate.getTime() === now.getTime()) {
       throw new ForbiddenException('Start date must be in the future');
     }
 
-    if (endDate < now) {
+    if (isUTCBefore(endDate, now) || endDate.getTime() === now.getTime()) {
       throw new ForbiddenException('End date must be in the future');
     }
 
-    if (endDate <= startDate) {
+    if (isUTCBefore(endDate, startDate) || endDate.getTime() === startDate.getTime()) {
       throw new BadRequestException('End date must be after start date');
     }
   }

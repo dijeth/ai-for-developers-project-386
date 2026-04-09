@@ -6,6 +6,16 @@ import { TimeOffService } from '../../prisma/models/time-off.service';
 import { AvailableSlotDto } from '../../dto/slot/available-slot.dto';
 import { DayOfWeek } from '../../common/enums/day-of-week.enum';
 import { TimeInterval, generateSlotsFromGaps } from '../../common/utils/slot.utils';
+import {
+  utcNow,
+  fromISO,
+  startOfUTCDay,
+  addUTCDays,
+  setUTCHours,
+  getUTCDay,
+  addUTCMonths,
+  isUTCBefore,
+} from '../../common/utils/date.utils';
 
 @Injectable()
 export class AvailableSlotsService {
@@ -41,16 +51,14 @@ export class AvailableSlotsService {
     this.validateForDate(forDate, owner.bookingMonthsAhead);
 
     // Get all bookings and time-offs for the day
-    const dayStart = new Date(forDate);
-    dayStart.setUTCHours(0, 0, 0, 0);
-    const dayEnd = new Date(dayStart);
-    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+    const dayStart = startOfUTCDay(forDate);
+    const dayEnd = addUTCDays(dayStart, 1);
 
     const bookings = await this.bookingService.findInRange(dayStart, dayEnd);
     const timeOffs = await this.timeOffService.findAll(this.ownerId);
 
     // Generate slots for the day
-    const now = new Date();
+    const now = utcNow();
     const slots = this.generateSlotsForDay(
       forDate,
       owner,
@@ -64,7 +72,7 @@ export class AvailableSlotsService {
   }
 
   private parseDate(dateStr: string): Date {
-    const date = new Date(dateStr);
+    const date = fromISO(dateStr);
     if (isNaN(date.getTime())) {
       throw new BadRequestException(`Invalid date format: ${dateStr}`);
     }
@@ -73,23 +81,20 @@ export class AvailableSlotsService {
 
   private validateForDate(forDate: Date, bookingMonthsAhead: number): void {
     // Set forDate to start of day for comparison
-    const forDateStart = new Date(forDate);
-    forDateStart.setUTCHours(0, 0, 0, 0);
+    const forDateStart = startOfUTCDay(forDate);
 
     // Check forDate is not in the past (must be today or in the future)
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    const today = startOfUTCDay(utcNow());
 
-    if (forDateStart < today) {
+    if (isUTCBefore(forDateStart, today)) {
       throw new BadRequestException('Date must be today or in the future');
     }
 
     // Calculate max allowed date: today + bookingMonthsAhead months
-    const maxAllowedDate = new Date(today);
-    maxAllowedDate.setUTCMonth(maxAllowedDate.getUTCMonth() + bookingMonthsAhead);
+    const maxAllowedDate = addUTCMonths(today, bookingMonthsAhead);
 
     // forDate must be less than or equal to maxAllowedDate
-    if (forDateStart > maxAllowedDate) {
+    if (isUTCBefore(maxAllowedDate, forDateStart)) {
       throw new BadRequestException(
         `Date must be within ${bookingMonthsAhead} months from today`,
       );
@@ -145,14 +150,13 @@ export class AvailableSlotsService {
       DayOfWeek.FRI,
       DayOfWeek.SAT,
     ];
-    return days[date.getUTCDay()];
+    return days[getUTCDay(date)];
   }
 
   private combineDateAndTime(date: Date, timeStr: string): Date {
     const [hours, minutes] = timeStr.split(':').map(Number);
     const result = new Date(date);
-    result.setUTCHours(hours, minutes, 0, 0);
-    return result;
+    return setUTCHours(result, hours, minutes);
   }
 
   private getBusyIntervalsForDay(
