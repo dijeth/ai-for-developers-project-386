@@ -19,6 +19,9 @@ model Owner {
   avatar             String?
   bookingMonthsAhead Int      @default(3) // 1-12 months
 
+  // Timezone for the owner (e.g., Europe/Moscow, America/New_York)
+  timezone             String   @default("Europe/Moscow")
+
   // WorkingHours are embedded in Owner (not a separate table)
   workingHoursStart  String   @default("09:00") // format HH:MM
   workingHoursEnd    String   @default("17:00") // format HH:MM

@@ -1,3 +1,11 @@
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+// Enable plugins
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 /**
  * Frontend UTC Date Utilities
  *
@@ -8,28 +16,54 @@
  * 1. Calendar/UI shows dates in local time (browser default)
  * 2. API calls use UTC strings (use toUTCDateString())
  * 3. Dates from API are parsed as UTC (use fromISO())
+ *
+ * Flow:
+ * - Client selects date in Calendar (local timezone)
+ * - toUTCDateString(): start of day in local TZ -> convert to UTC ISO
+ * - toUTCEndOfDayString(): end of day in local TZ -> convert to UTC ISO
+ * - API call with UTC ISO strings
  */
 
 /**
- * Converts a local Date to UTC ISO string for backend API.
- * Returns YYYY-MM-DDT00:00:00.000Z format.
+ * Converts a local Date to UTC ISO string for start of day.
+ * Returns YYYY-MM-DDTHH:mm:ss.sssZ format in UTC.
+ *
+ * Logic:
+ * 1. Take the date selected by client in their local timezone
+ * 2. Set time to start of day (00:00:00) in local timezone
+ * 3. Convert to UTC and return ISO string
+ *
+ * Example: client in Perm (+5) selects April 10
+ *   -> local start: Apr 10 00:00:00 GMT+0500
+ *   -> UTC: Apr 9 19:00:00 GMT+0000
+ *   -> returns "2025-04-09T19:00:00.000Z"
  */
 export function toUTCDateString(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}T00:00:00.000Z`;
+  return dayjs(date)
+    .startOf('day')
+    .utc()
+    .toISOString();
 }
 
 /**
  * Converts a local Date to UTC ISO string for end of day.
- * Returns YYYY-MM-DDT23:59:59.999Z format.
+ * Returns YYYY-MM-DDTHH:mm:ss.sssZ format in UTC.
+ *
+ * Logic:
+ * 1. Take the date selected by client in their local timezone
+ * 2. Set time to end of day (23:59:59.999) in local timezone
+ * 3. Convert to UTC and return ISO string
+ *
+ * Example: client in Perm (+5) selects April 10
+ *   -> local end: Apr 10 23:59:59.999 GMT+0500
+ *   -> UTC: Apr 10 18:59:59.999 GMT+0000
+ *   -> returns "2025-04-10T18:59:59.999Z"
  */
 export function toUTCEndOfDayString(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}T23:59:59.999Z`;
+  return dayjs(date)
+    .endOf('day')
+    .utc()
+    .toISOString();
 }
 
 /**
@@ -168,4 +202,40 @@ export function startOfLocalDay(date: Date): Date {
  */
 export function getLocalDayOfWeek(date: Date): number {
   return date.getDay();
+}
+
+// ============================================================================
+// Timezone-specific utilities for Admin (using owner's timezone)
+// ============================================================================
+
+/**
+ * Gets month date range in admin's timezone, returns UTC ISO strings.
+ *
+ * Logic:
+ * 1. Take the date (represents a month in admin's calendar)
+ * 2. Get first day of that month in admin's timezone
+ * 3. Get last day of that month in admin's timezone  
+ * 4. Convert both to UTC ISO strings
+ *
+ * Example: admin in Moscow (+3), viewing April 2025
+ *   -> First day: Apr 1 00:00:00 MSK = "2025-03-31T21:00:00.000Z"
+ *   -> Last day: Apr 30 23:59:59.999 MSK = "2025-04-30T20:59:59.999Z"
+ */
+export function getMonthDateRangeInTimezone(
+  date: Date,
+  timezone: string
+): { dateFrom: string; dateTo: string } {
+  // Create dayjs object in admin's timezone
+  const adminDate = dayjs(date).tz(timezone);
+  
+  // Get first day of month in admin's timezone
+  const startOfMonth = adminDate.startOf('month');
+  
+  // Get last day of month in admin's timezone
+  const endOfMonth = adminDate.endOf('month');
+  
+  return {
+    dateFrom: startOfMonth.utc().toISOString(),
+    dateTo: endOfMonth.utc().toISOString()
+  };
 }

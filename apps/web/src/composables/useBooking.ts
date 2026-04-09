@@ -42,12 +42,15 @@ export function useAvailableSlots() {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
-  const fetchSlots = async (eventTypeId: string, forDate: string) => {
+  const fetchSlots = async (eventTypeId: string, dateFrom: string, dateTo: string) => {
     isLoading.value = true;
     error.value = null;
     try {
+      const params = new URLSearchParams();
+      params.append('dateFrom', dateFrom);
+      params.append('dateTo', dateTo);
       const response = await fetch(
-        `${API_BASE_URL}/event-types/${eventTypeId}/available-slots?forDate=${forDate}`
+        `${API_BASE_URL}/event-types/${eventTypeId}/available-slots?${params.toString()}`
       );
       if (!response.ok) {
         throw new Error('Failed to fetch available slots');
@@ -145,7 +148,7 @@ export function useCreateBooking() {
 }
 
 // Re-export for backward compatibility
-export { toUTCDateString } from '../utils/date.utils';
+export { toUTCDateString, toUTCEndOfDayString } from '../utils/date.utils';
 export { formatLongDate as formatDate } from '../utils/date.utils';
 
 /**

@@ -9,13 +9,20 @@ import { TimeInterval, generateSlotsFromGaps } from '../../common/utils/slot.uti
 import {
   utcNow,
   fromISO,
-  startOfUTCDay,
   addUTCDays,
-  setUTCHours,
-  getUTCDay,
   addUTCMonths,
   isUTCBefore,
+  isUTCAfter,
+  isSameUTCDay,
+  startOfUTCDay,
+  getDayOfWeekInTimezone,
 } from '../../common/utils/date.utils';
+import * as dayjs from 'dayjs';
+import * as utc from 'dayjs/plugin/utc';
+import * as timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 @Injectable()
 export class AvailableSlotsService {
@@ -30,7 +37,8 @@ export class AvailableSlotsService {
 
   async getAvailableSlots(
     eventTypeId: string,
-    forDateStr: string,
+    startDateStr: string,
+    endDateStr: string,
   ): Promise<AvailableSlotDto[]> {
     // Validate event type exists
     const eventType = await this.eventTypeService.findOne(eventTypeId);
@@ -38,8 +46,9 @@ export class AvailableSlotsService {
       throw new NotFoundException('Event type not found');
     }
 
-    // Parse date
-    const forDate = this.parseDate(forDateStr);
+    // Parse dates
+    const startDate = this.parseDate(startDateStr);
+    const endDate = this.parseDate(endDateStr);
 
     // Get owner data
     const owner = await this.ownerService.findOne(this.ownerId);
@@ -47,20 +56,22 @@ export class AvailableSlotsService {
       throw new NotFoundException('Owner not found');
     }
 
-    // Validate the requested date
-    this.validateForDate(forDate, owner.bookingMonthsAhead);
+    // Validate the requested date range
+    this.validateDateRange(startDate, endDate, owner.bookingMonthsAhead);
 
-    // Get all bookings and time-offs for the day
-    const dayStart = startOfUTCDay(forDate);
-    const dayEnd = addUTCDays(dayStart, 1);
+    // Get bookings and time-offs that overlap with the requested range
+    const bookings = await this.bookingService.findInRange(startDate, endDate);
+    const allTimeOffs = await this.timeOffService.findAll(this.ownerId);
+    // Filter time-offs that overlap with the requested range
+    const timeOffs = allTimeOffs.filter(
+      (to) => to.startDateTime < endDate && to.endDateTime > startDate,
+    );
 
-    const bookings = await this.bookingService.findInRange(dayStart, dayEnd);
-    const timeOffs = await this.timeOffService.findAll(this.ownerId);
-
-    // Generate slots for the day
+    // Generate available slots for the range
     const now = utcNow();
-    const slots = this.generateSlotsForDay(
-      forDate,
+    const slots = this.generateSlotsForRange(
+      startDate,
+      endDate,
       owner,
       eventType.durationMinutes,
       bookings,
@@ -79,68 +90,123 @@ export class AvailableSlotsService {
     return date;
   }
 
-  private validateForDate(forDate: Date, bookingMonthsAhead: number): void {
-    // Set forDate to start of day for comparison
-    const forDateStart = startOfUTCDay(forDate);
+  private validateDateRange(startDate: Date, endDate: Date, bookingMonthsAhead: number): void {
+    // Check that startDate is not after endDate
+    if (isUTCBefore(endDate, startDate)) {
+      throw new BadRequestException('End date must be after start date');
+    }
 
-    // Check forDate is not in the past (must be today or in the future)
     const today = startOfUTCDay(utcNow());
 
-    if (isUTCBefore(forDateStart, today)) {
-      throw new BadRequestException('Date must be today or in the future');
+    // Check that startDate is not in the past
+    if (isUTCBefore(startDate, today)) {
+      throw new BadRequestException('Start date must be today or in the future');
     }
 
     // Calculate max allowed date: today + bookingMonthsAhead months
     const maxAllowedDate = addUTCMonths(today, bookingMonthsAhead);
 
-    // forDate must be less than or equal to maxAllowedDate
-    if (isUTCBefore(maxAllowedDate, forDateStart)) {
+    // Both startDate and endDate must be within the allowed range
+    if (isUTCBefore(maxAllowedDate, endDate)) {
       throw new BadRequestException(
-        `Date must be within ${bookingMonthsAhead} months from today`,
+        `Date range must be within ${bookingMonthsAhead} months from today`,
       );
     }
   }
 
-  private generateSlotsForDay(
-    date: Date,
+  private generateSlotsForRange(
+    startDate: Date,
+    endDate: Date,
     owner: {
       workingDays: DayOfWeek[];
       workingHoursStart: string;
       workingHoursEnd: string;
+      timezone: string;
     },
     durationMinutes: number,
     bookings: Array<{ startTime: Date; endTime: Date }>,
     timeOffs: Array<{ startDateTime: Date; endDateTime: Date }>,
     now: Date,
   ): AvailableSlotDto[] {
-    // Get day of week
-    const dayOfWeek = this.getDayOfWeek(date);
+    const allSlots: AvailableSlotDto[] = [];
+    const [startHours, startMinutes] = owner.workingHoursStart.split(':').map(Number);
+    const [endHours, endMinutes] = owner.workingHoursEnd.split(':').map(Number);
 
-    // Check if it's a working day
-    if (!owner.workingDays.includes(dayOfWeek)) {
-      return [];
+    // Iterate through each day in the range
+    let currentDate = startOfUTCDay(startDate);
+    const rangeEnd = endDate;
+
+    while (isUTCBefore(currentDate, rangeEnd) || isSameUTCDay(currentDate, rangeEnd)) {
+      // Check if this day is a working day (using owner's timezone)
+      const dayOfWeekNum = getDayOfWeekInTimezone(currentDate, owner.timezone);
+      const dayOfWeek = this.numberToDayOfWeek(dayOfWeekNum);
+      if (owner.workingDays.includes(dayOfWeek)) {
+        // Calculate working hours for this day in owner's timezone, converted to UTC
+        const dayWorkingStart = this.convertLocalTimeToUTC(
+          currentDate,
+          startHours,
+          startMinutes,
+          owner.timezone,
+        );
+        const dayWorkingEnd = this.convertLocalTimeToUTC(
+          currentDate,
+          endHours,
+          endMinutes,
+          owner.timezone,
+        );
+
+        // Clamp working hours to the requested range
+        const effectiveStart = isUTCAfter(dayWorkingStart, startDate)
+          ? dayWorkingStart
+          : startDate;
+        const effectiveEnd = isUTCBefore(dayWorkingEnd, endDate) ? dayWorkingEnd : endDate;
+
+        // Only process if there's a valid working window
+        if (isUTCBefore(effectiveStart, effectiveEnd)) {
+          // Get busy intervals that overlap with this day's working hours
+          const busyIntervals = this.getBusyIntervalsForRange(
+            effectiveStart,
+            effectiveEnd,
+            bookings,
+            timeOffs,
+          );
+
+          // Generate available slots from gaps
+          const slots = generateSlotsFromGaps(effectiveStart, effectiveEnd, busyIntervals, durationMinutes);
+
+          // Filter out slots that have already started and add to result
+          for (const slot of slots) {
+            const slotStart = fromISO(slot.startTime);
+            if (isUTCAfter(slotStart, now)) {
+              allSlots.push(slot);
+            }
+          }
+        }
+      }
+
+      // Move to next day
+      currentDate = addUTCDays(currentDate, 1);
     }
 
-    // Calculate day boundaries
-    const dayStart = this.combineDateAndTime(date, owner.workingHoursStart);
-    const dayEnd = this.combineDateAndTime(date, owner.workingHoursEnd);
-
-    // Get busy intervals for this day (bookings + time-offs)
-    const busyIntervals = this.getBusyIntervalsForDay(dayStart, dayEnd, bookings, timeOffs);
-
-    // Generate available slots from gaps
-    const slots = generateSlotsFromGaps(dayStart, dayEnd, busyIntervals, durationMinutes);
-
-    // Filter out slots that have already started
-    return slots
-      .filter((slot) => new Date(slot.startTime) > now)
-      .map((slot) => ({
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-      }));
+    return allSlots;
   }
 
-  private getDayOfWeek(date: Date): DayOfWeek {
+  private convertLocalTimeToUTC(date: Date, hours: number, minutes: number, timeZone: string): Date {
+    // Create a dayjs object in the owner's timezone for this specific date and time
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+
+    const localDateTime = dayjs.tz(
+      `${year}-${month}-${day} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`,
+      timeZone,
+    );
+
+    // Convert to UTC and return as Date
+    return localDateTime.utc().toDate();
+  }
+
+  private numberToDayOfWeek(dayNum: number): DayOfWeek {
     const days: DayOfWeek[] = [
       DayOfWeek.SUN,
       DayOfWeek.MON,
@@ -150,39 +216,33 @@ export class AvailableSlotsService {
       DayOfWeek.FRI,
       DayOfWeek.SAT,
     ];
-    return days[getUTCDay(date)];
+    return days[dayNum];
   }
 
-  private combineDateAndTime(date: Date, timeStr: string): Date {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const result = new Date(date);
-    return setUTCHours(result, hours, minutes);
-  }
-
-  private getBusyIntervalsForDay(
-    dayStart: Date,
-    dayEnd: Date,
+  private getBusyIntervalsForRange(
+    rangeStart: Date,
+    rangeEnd: Date,
     bookings: Array<{ startTime: Date; endTime: Date }>,
     timeOffs: Array<{ startDateTime: Date; endDateTime: Date }>,
   ): TimeInterval[] {
     const busy: TimeInterval[] = [];
 
-    // Add bookings that overlap with this day
+    // Add bookings that overlap with this range
     for (const booking of bookings) {
-      if (booking.startTime < dayEnd && booking.endTime > dayStart) {
+      if (booking.startTime < rangeEnd && booking.endTime > rangeStart) {
         busy.push({
-          start: new Date(Math.max(booking.startTime.getTime(), dayStart.getTime())),
-          end: new Date(Math.min(booking.endTime.getTime(), dayEnd.getTime())),
+          start: new Date(Math.max(booking.startTime.getTime(), rangeStart.getTime())),
+          end: new Date(Math.min(booking.endTime.getTime(), rangeEnd.getTime())),
         });
       }
     }
 
-    // Add time-offs that overlap with this day
+    // Add time-offs that overlap with this range
     for (const to of timeOffs) {
-      if (to.startDateTime < dayEnd && to.endDateTime > dayStart) {
+      if (to.startDateTime < rangeEnd && to.endDateTime > rangeStart) {
         busy.push({
-          start: new Date(Math.max(to.startDateTime.getTime(), dayStart.getTime())),
-          end: new Date(Math.min(to.endDateTime.getTime(), dayEnd.getTime())),
+          start: new Date(Math.max(to.startDateTime.getTime(), rangeStart.getTime())),
+          end: new Date(Math.min(to.endDateTime.getTime(), rangeEnd.getTime())),
         });
       }
     }

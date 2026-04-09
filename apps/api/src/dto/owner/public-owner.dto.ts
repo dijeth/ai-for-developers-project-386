@@ -5,6 +5,7 @@ export interface PublicOwnerDto {
   description?: string;
   avatar?: string;
   bookingMonthsAhead?: number;
+  timezone: string;
   workingHours: {
     startTime: string;
     endTime: string;

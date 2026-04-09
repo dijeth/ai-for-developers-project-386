@@ -24,6 +24,7 @@ export class PublicOwnerApiService {
     description: string | null;
     avatar: string | null;
     bookingMonthsAhead: number;
+    timezone: string;
     workingHoursStart: string;
     workingHoursEnd: string;
     workingDays: DayOfWeek[];
@@ -33,6 +34,7 @@ export class PublicOwnerApiService {
       description: owner.description ?? undefined,
       avatar: owner.avatar ?? undefined,
       bookingMonthsAhead: owner.bookingMonthsAhead,
+      timezone: owner.timezone,
       workingHours: {
         startTime: owner.workingHoursStart,
         endTime: owner.workingHoursEnd,

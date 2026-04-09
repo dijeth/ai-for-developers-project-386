@@ -24,6 +24,8 @@ export interface Owner {
   description?: string;
   avatar?: string;
   bookingMonthsAhead?: number;
+  /** Timezone for displaying dates (IANA format) */
+  timezone: string;
   workingHours: WorkingHours;
 }
 

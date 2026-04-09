@@ -82,14 +82,15 @@ const filterBookingsByDate = (bookings: Booking[], date: Date): Booking[] => {
   });
 };
 
-// Get month date range
+// Get month date range using browser's local timezone
+// Admin uses local timezone regardless of owner.timezone in profile
 const getMonthDateRange = (date: Date): { dateFrom: string; dateTo: string } => {
   const year = date.getFullYear();
   const month = date.getMonth();
   
-  // First day of month
+  // First day of month in browser's local timezone
   const firstDay = new Date(year, month, 1);
-  // Last day of month
+  // Last day of month in browser's local timezone
   const lastDay = new Date(year, month + 1, 0);
   
   return {

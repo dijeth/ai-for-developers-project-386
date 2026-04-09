@@ -111,6 +111,10 @@ model Owner {
   @example(3)
   bookingMonthsAhead?: int32;
 
+  /** Timezone for displaying dates (IANA format) */
+  @example("Europe/Moscow")
+  timezone: string;
+
   workingHours: WorkingHours;
 }
 
@@ -133,6 +137,10 @@ model PublicOwner {
   @maxValue(12)
   @example(3)
   bookingMonthsAhead?: int32;
+
+  /** Timezone for displaying dates (IANA format) */
+  @example("Europe/Moscow")
+  timezone: string;
 
   /** Working hours for display (excludes time-offs details) */
   workingHours: {
@@ -245,8 +253,13 @@ model CreateBookingRequest {
  * Get available slots parameters
  */
 model GetAvailableSlotsParams {
+  /** Start of day in client timezone, converted to UTC */
   @query
-  forDate: utcDateTime;
+  dateFrom: utcDateTime;
+
+  /** End of day in client timezone, converted to UTC */
+  @query
+  dateTo: utcDateTime;
 }
 
 /**
@@ -291,6 +304,10 @@ model UpdateOwnerRequest {
   @minValue(1)
   @maxValue(12)
   bookingMonthsAhead?: int32;
+
+  /** Timezone for displaying dates (IANA format) */
+  @example("Europe/Moscow")
+  timezone?: string;
 
   workingHours?: WorkingHours;
 }
@@ -529,15 +546,17 @@ interface PublicEventTypes {
    * Get available slots for event type
    * Rules:
    * - All times are in UTC
-   * - forDate must be today or in the future
-   * - forDate must not exceed bookingMonthsAhead from today
+   * - dateFrom/dateTo must represent a single day range in client timezone
+   * - dateFrom must be today or in the future
+   * - dateTo must not exceed bookingMonthsAhead from today
    */
   @get
   @route("/event-types/{id}/available-slots")
   @summary("Get available slots for event type (all times in UTC)")
   getAvailableSlots(
     @path id: string,
-    @query forDate: utcDateTime
+    @query dateFrom: utcDateTime,
+    @query dateTo: utcDateTime
   ): {
     @statusCode statusCode: 200;
     @body response: AvailableSlotsResponse;

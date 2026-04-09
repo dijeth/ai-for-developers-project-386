@@ -24,6 +24,7 @@ async function main() {
       description: 'Senior Software Architect & Tech Lead with 10+ years of experience in building scalable systems. Available for architecture reviews, code reviews, and mentorship sessions.',
       avatar: 'https://i.pravatar.cc/150?img=5',
       bookingMonthsAhead: 3,
+      timezone: 'Europe/Moscow',
       workingHoursStart: '09:00',
       workingHoursEnd: '17:00',
       workingDays: JSON.stringify(['mon', 'tue', 'wed', 'thu', 'fri']),

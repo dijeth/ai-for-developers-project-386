@@ -54,6 +54,10 @@ export class UpdateOwnerDto {
   @IsOptional()
   bookingMonthsAhead?: number;
 
+  @IsString()
+  @IsOptional()
+  timezone?: string;
+
   @ValidateNested()
   @Type(() => WorkingHoursUpdateDto)
   @IsOptional()

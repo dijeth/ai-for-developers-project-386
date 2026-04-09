@@ -10,7 +10,7 @@ import { OwnerService } from '../../prisma/models/owner.service';
 import { CreateBookingDto } from '../../dto/booking/create-booking.dto';
 import { BookingDto } from '../../dto/booking/booking.dto';
 import { AvailableSlotsService } from './available-slots.service';
-import { fromISO, utcNow, startOfUTCDay, isUTCBefore } from '../../common/utils/date.utils';
+import { fromISO, utcNow, startOfUTCDay, isUTCBefore, addUTCDays } from '../../common/utils/date.utils';
 
 @Injectable()
 export class PublicBookingApiService {
@@ -67,11 +67,14 @@ export class PublicBookingApiService {
   ): Promise<void> {
     // Get the day of the booking for slot query
     const dayStart = startOfUTCDay(startTime);
+    // End of day is start of next day (exclusive)
+    const dayEnd = addUTCDays(dayStart, 1);
 
-    // Get available slots for that day (pass as UTC datetime with 00:00:00)
+    // Get available slots for that day (pass as UTC datetime range)
     const availableSlots = await this.availableSlotsService.getAvailableSlots(
       eventTypeId,
       dayStart.toISOString(),
+      dayEnd.toISOString(),
     );
 
     // Check if requested slot is in available slots

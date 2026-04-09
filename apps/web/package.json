@@ -12,7 +12,7 @@
     "postinstall": "npm run copy-themes"
   },
   "dependencies": {
-    "dayjs": "^1.11.0",
+    "dayjs": "^1.11.20",
     "primeicons": "^6.0.0",
     "primevue": "^3.50.0",
     "vue": "^3.4.0",

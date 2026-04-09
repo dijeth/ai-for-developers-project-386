@@ -49,6 +49,9 @@ export class OwnerDto {
   @IsOptional()
   bookingMonthsAhead?: number;
 
+  @IsString()
+  timezone!: string;
+
   @ValidateNested()
   @Type(() => WorkingHoursDto)
   workingHours!: WorkingHoursDto;

@@ -428,15 +428,23 @@ paths:
         Get available slots for event type
         Rules:
         - All times are in UTC
-        - forDate must be today or in the future
-        - forDate must not exceed bookingMonthsAhead from today
+        - dateFrom/dateTo must represent a single day range in client timezone
+        - dateFrom must be today or in the future
+        - dateTo must not exceed bookingMonthsAhead from today
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: string
-        - name: forDate
+        - name: dateFrom
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          explode: false
+        - name: dateTo
           in: query
           required: true
           schema:
@@ -649,11 +657,17 @@ components:
     GetAvailableSlotsParams:
       type: object
       required:
-        - forDate
+        - dateFrom
+        - dateTo
       properties:
-        forDate:
+        dateFrom:
           type: string
           format: date-time
+          description: Start of day in client timezone, converted to UTC
+        dateTo:
+          type: string
+          format: date-time
+          description: End of day in client timezone, converted to UTC
       description: Get available slots parameters
     Guest:
       type: object
@@ -677,6 +691,7 @@ components:
       required:
         - name
         - email
+        - timezone
         - workingHours
       properties:
         name:
@@ -701,6 +716,11 @@ components:
           description: Number of months ahead that booking is possible
           examples:
             - 3
+        timezone:
+          type: string
+          description: Timezone for displaying dates (IANA format)
+          examples:
+            - Europe/Moscow
         workingHours:
           $ref: '#/components/schemas/WorkingHours'
       description: Calendar owner profile (static, single owner)
@@ -708,6 +728,7 @@ components:
       type: object
       required:
         - name
+        - timezone
         - workingHours
       properties:
         name:
@@ -729,6 +750,11 @@ components:
           description: Number of months ahead that booking is possible
           examples:
             - 3
+        timezone:
+          type: string
+          description: Timezone for displaying dates (IANA format)
+          examples:
+            - Europe/Moscow
         workingHours:
           type: object
           properties:
@@ -784,6 +810,11 @@ components:
           minimum: 1
           maximum: 12
           description: Number of months ahead that booking is possible
+        timezone:
+          type: string
+          description: Timezone for displaying dates (IANA format)
+          examples:
+            - Europe/Moscow
         workingHours:
           $ref: '#/components/schemas/WorkingHours'
       description: Update working hours request

@@ -7,7 +7,8 @@ import {
   useAvailableSlots, 
   useOwner, 
   useCreateBooking,
-  toUTCDateString 
+  toUTCDateString,
+  toUTCEndOfDayString
 } from '../composables/useBooking';
 import EventTypeSelection from '../components/booking/EventTypeSelection.vue';
 import SlotPicker from '../components/booking/SlotPicker.vue';
@@ -53,8 +54,9 @@ watch(
   () => [state.selectedEventType?.id, state.selectedDate],
   ([eventTypeId, date]) => {
     if (eventTypeId && date) {
-      const dateStr = toUTCDateString(date as Date);
-      fetchSlots(eventTypeId as string, dateStr);
+      const dateFrom = toUTCDateString(date as Date);
+      const dateTo = toUTCEndOfDayString(date as Date);
+      fetchSlots(eventTypeId as string, dateFrom, dateTo);
     }
   },
   { immediate: true }

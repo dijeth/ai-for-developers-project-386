@@ -1,3 +1,10 @@
+import * as dayjs from 'dayjs';
+import * as utc from 'dayjs/plugin/utc';
+import * as timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 /**
  * UTC Date Utilities
  *
@@ -195,4 +202,38 @@ export function formatUTCTime(date: Date): string {
   const hours = String(date.getUTCHours()).padStart(2, '0');
   const minutes = String(date.getUTCMinutes()).padStart(2, '0');
   return `${hours}:${minutes}`;
+}
+
+/**
+ * Converts local time string in a specific timezone to UTC Date.
+ * The date parameter provides the day, and timeStr provides HH:MM in the owner's timezone.
+ * Returns a UTC Date representing that exact moment.
+ *
+ * Example: convertLocalTimeToUTC(2024-01-15, "09:00", "Europe/Moscow")
+ *          -> Date at 06:00 UTC (since Moscow is UTC+3)
+ */
+export function convertLocalTimeToUTC(date: Date, timeStr: string, timeZone: string): Date {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const dateStr = formatUTCDate(date); // YYYY-MM-DD
+
+  // Create dayjs object in the target timezone with the specific time
+  const localDateTime = dayjs.tz(
+    `${dateStr} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`,
+    timeZone
+  );
+
+  // Convert to UTC and return as Date
+  return localDateTime.utc().toDate();
+}
+
+/**
+ * Gets day of week (0-6, Sun-Sat) in a specific timezone.
+ * This is crucial for checking working days when the owner's timezone
+ * differs from UTC. A date might be Monday in UTC but Sunday in owner's timezone.
+ *
+ * Example: getDayOfWeekInTimezone(2024-01-15T23:00:00Z, "Europe/Moscow")
+ *          -> 2 (Tuesday) because in Moscow it's already 2024-01-16
+ */
+export function getDayOfWeekInTimezone(date: Date, timeZone: string): number {
+  return dayjs(date).tz(timeZone).day();
 }

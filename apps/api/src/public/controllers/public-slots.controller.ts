@@ -14,7 +14,8 @@ export class PublicSlotsController {
   ): Promise<AvailableSlotsResponseDto> {
     const slots = await this.availableSlotsService.getAvailableSlots(
       id,
-      query.forDate,
+      query.dateFrom,
+      query.dateTo,
     );
     return { slots };
   }
