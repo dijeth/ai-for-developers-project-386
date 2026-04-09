@@ -54,7 +54,7 @@ export class AvailableSlotsService {
     const now = new Date();
 
     const currentDate = new Date(startDate);
-    while (currentDate < endDate) {
+    while (currentDate <= endDate) {
       const daySlots = this.generateSlotsForDay(
         currentDate,
         owner,
