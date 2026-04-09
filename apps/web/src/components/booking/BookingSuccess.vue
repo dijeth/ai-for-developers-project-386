@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import type { Booking, EventType } from '../../types/booking';
+import type { Booking } from '../../types/booking';
 import Button from 'primevue/button';
 import { formatDate, formatSlotTime } from '../../composables/useBooking';
 
 interface Props {
   booking: Booking;
-  eventType: EventType;
 }
 
 defineProps<Props>();
@@ -28,7 +27,7 @@ const handleGoHome = () => {
       </div>
       
       <div class="details-section">
-        <h2 class="event-title">{{ eventType.title }}</h2>
+        <h2 class="event-title">{{ booking.eventType.title }}</h2>
         
         <div class="info-blocks">
           <div class="info-block">

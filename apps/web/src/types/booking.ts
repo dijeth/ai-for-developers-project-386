@@ -17,7 +17,7 @@ export interface Guest {
 
 export interface Booking {
   id: string;
-  eventTypeId: string;
+  eventType: EventType;
   startTime: string;
   endTime: string;
   guest: Guest;

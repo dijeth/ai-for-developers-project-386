@@ -38,12 +38,12 @@ export function useAvailableSlots() {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
-  const fetchSlots = async (eventTypeId: string, startDate: string, endDate: string) => {
+  const fetchSlots = async (eventTypeId: string, forDate: string) => {
     isLoading.value = true;
     error.value = null;
     try {
       const response = await fetch(
-        `${API_BASE_URL}/event-types/${eventTypeId}/available-slots?startDate=${startDate}&endDate=${endDate}`
+        `${API_BASE_URL}/event-types/${eventTypeId}/available-slots?forDate=${forDate}`
       );
       if (!response.ok) {
         throw new Error('Failed to fetch available slots');
@@ -160,6 +160,11 @@ export function formatDate(date: Date): string {
   });
 }
 
-export function toISODate(date: Date): string {
-  return date.toISOString().split('T')[0];
+export function toUTCDateString(date: Date): string {
+  // Return UTC datetime with time set to 00:00:00
+  // This ensures no timezone confusion between frontend and backend
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}T00:00:00.000Z`;
 }

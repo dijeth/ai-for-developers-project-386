@@ -20,8 +20,7 @@ export class AvailableSlotsService {
 
   async getAvailableSlots(
     eventTypeId: string,
-    startDateStr: string,
-    endDateStr: string,
+    forDateStr: string,
   ): Promise<AvailableSlotDto[]> {
     // Validate event type exists
     const eventType = await this.eventTypeService.findOne(eventTypeId);
@@ -29,12 +28,8 @@ export class AvailableSlotsService {
       throw new NotFoundException('Event type not found');
     }
 
-    // Parse dates
-    const startDate = this.parseDate(startDateStr);
-    const endDate = this.parseDate(endDateStr);
-
-    // Validate date range
-    this.validateDateRange(startDate, endDate);
+    // Parse date
+    const forDate = this.parseDate(forDateStr);
 
     // Get owner data
     const owner = await this.ownerService.findOne(this.ownerId);
@@ -42,32 +37,28 @@ export class AvailableSlotsService {
       throw new NotFoundException('Owner not found');
     }
 
-    // Validate against bookingMonthsAhead
-    this.validateBookingMonthsAhead(startDate, endDate, owner.bookingMonthsAhead);
+    // Validate the requested date
+    this.validateForDate(forDate, owner.bookingMonthsAhead);
 
-    // Get all bookings and time-offs in the range
-    const bookings = await this.bookingService.findInRange(startDate, endDate);
+    // Get all bookings and time-offs for the day
+    const dayStart = new Date(forDate);
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+
+    const bookings = await this.bookingService.findInRange(dayStart, dayEnd);
     const timeOffs = await this.timeOffService.findAll(this.ownerId);
 
-    // Generate slots for each day
-    const slots: AvailableSlotDto[] = [];
+    // Generate slots for the day
     const now = new Date();
-
-    const currentDate = new Date(startDate);
-    while (currentDate <= endDate) {
-      const daySlots = this.generateSlotsForDay(
-        currentDate,
-        owner,
-        eventType.durationMinutes,
-        bookings,
-        timeOffs,
-        now,
-      );
-      slots.push(...daySlots);
-
-      // Move to next day
-      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-    }
+    const slots = this.generateSlotsForDay(
+      forDate,
+      owner,
+      eventType.durationMinutes,
+      bookings,
+      timeOffs,
+      now,
+    );
 
     return slots;
   }
@@ -80,41 +71,27 @@ export class AvailableSlotsService {
     return date;
   }
 
-  private validateDateRange(startDate: Date, endDate: Date): void {
-    // Set both dates to start of day for comparison
-    const startOfDay = new Date(startDate);
-    startOfDay.setUTCHours(0, 0, 0, 0);
+  private validateForDate(forDate: Date, bookingMonthsAhead: number): void {
+    // Set forDate to start of day for comparison
+    const forDateStart = new Date(forDate);
+    forDateStart.setUTCHours(0, 0, 0, 0);
 
-    const endOfDay = new Date(endDate);
-    endOfDay.setUTCHours(0, 0, 0, 0);
-
-    // Check startDate is not in the past
+    // Check forDate is not in the past (must be today or in the future)
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
-    if (startOfDay < today) {
-      throw new BadRequestException('Start date must be today or in the future');
+    if (forDateStart < today) {
+      throw new BadRequestException('Date must be today or in the future');
     }
 
-    // Check endDate is not before startDate
-    if (endOfDay < startOfDay) {
-      throw new BadRequestException('End date must be after or equal to start date');
-    }
-  }
-
-  private validateBookingMonthsAhead(
-    startDate: Date,
-    endDate: Date,
-    bookingMonthsAhead: number,
-  ): void {
-    // Calculate max allowed date: startDate + bookingMonthsAhead months
-    const maxAllowedDate = new Date(startDate);
+    // Calculate max allowed date: today + bookingMonthsAhead months
+    const maxAllowedDate = new Date(today);
     maxAllowedDate.setUTCMonth(maxAllowedDate.getUTCMonth() + bookingMonthsAhead);
 
-    // endDate must be less than or equal to maxAllowedDate
-    if (endDate > maxAllowedDate) {
+    // forDate must be less than or equal to maxAllowedDate
+    if (forDateStart > maxAllowedDate) {
       throw new BadRequestException(
-        `End date must be less than or equal to ${bookingMonthsAhead} months from start date`,
+        `Date must be within ${bookingMonthsAhead} months from today`,
       );
     }
   }

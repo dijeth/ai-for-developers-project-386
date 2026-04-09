@@ -379,27 +379,20 @@ paths:
         Get available slots for event type
         Rules:
         - All times are in UTC
-        - Date range must not exceed 3 months
-        - startDate must be today or in the future
+        - forDate must be today or in the future
+        - forDate must not exceed bookingMonthsAhead from today
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: string
-        - name: startDate
+        - name: forDate
           in: query
           required: true
           schema:
             type: string
-            format: date
-          explode: false
-        - name: endDate
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
+            format: date-time
           explode: false
       responses:
         '200':
@@ -465,15 +458,15 @@ components:
       type: object
       required:
         - id
-        - eventTypeId
+        - eventType
         - endTime
         - guest
         - startTime
       properties:
         id:
           type: string
-        eventTypeId:
-          type: string
+        eventType:
+          $ref: '#/components/schemas/EventType'
         endTime:
           type: string
           format: date-time
@@ -607,15 +600,11 @@ components:
     GetAvailableSlotsParams:
       type: object
       required:
-        - startDate
-        - endDate
+        - forDate
       properties:
-        startDate:
+        forDate:
           type: string
-          format: date
-        endDate:
-          type: string
-          format: date
+          format: date-time
       description: Get available slots parameters
     Guest:
       type: object

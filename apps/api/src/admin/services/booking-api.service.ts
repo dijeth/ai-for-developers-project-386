@@ -30,8 +30,10 @@ export class BookingApiService {
       id: booking.id,
       startTime: booking.startTime.toISOString(),
       endTime: booking.endTime.toISOString(),
-      guestName: booking.guestName,
-      guestEmail: booking.guestEmail,
+      guest: {
+        name: booking.guestName,
+        email: booking.guestEmail,
+      },
       eventType: {
         id: booking.eventType.id,
         title: booking.eventType.title,

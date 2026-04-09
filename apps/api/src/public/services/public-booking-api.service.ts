@@ -64,18 +64,14 @@ export class PublicBookingApiService {
     startTime: Date,
     endTime: Date,
   ): Promise<void> {
-    // Get date range for slot query (just the day of the booking)
+    // Get the day of the booking for slot query
     const dayStart = new Date(startTime);
     dayStart.setUTCHours(0, 0, 0, 0);
 
-    const dayEnd = new Date(dayStart);
-    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
-
-    // Get available slots for that day
+    // Get available slots for that day (pass as UTC datetime with 00:00:00)
     const availableSlots = await this.availableSlotsService.getAvailableSlots(
       eventTypeId,
-      dayStart.toISOString().split('T')[0],
-      dayEnd.toISOString().split('T')[0],
+      dayStart.toISOString(),
     );
 
     // Check if requested slot is in available slots
@@ -108,8 +104,10 @@ export class PublicBookingApiService {
       id: booking.id,
       startTime: booking.startTime.toISOString(),
       endTime: booking.endTime.toISOString(),
-      guestName: booking.guestName,
-      guestEmail: booking.guestEmail,
+      guest: {
+        name: booking.guestName,
+        email: booking.guestEmail,
+      },
       eventType: {
         id: booking.eventType.id,
         title: booking.eventType.title,

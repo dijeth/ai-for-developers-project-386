@@ -17,6 +17,15 @@ export class BookingEventTypeDto {
   durationMinutes!: number;
 }
 
+export class GuestDto {
+  @IsString()
+  @MinLength(1)
+  name!: string;
+
+  @IsEmail()
+  email!: string;
+}
+
 export class BookingDto {
   @IsString()
   id!: string;
@@ -27,12 +36,9 @@ export class BookingDto {
   @IsDateString()
   endTime!: string;
 
-  @IsString()
-  @MinLength(1)
-  guestName!: string;
-
-  @IsEmail()
-  guestEmail!: string;
+  @ValidateNested()
+  @Type(() => GuestDto)
+  guest!: GuestDto;
 
   @ValidateNested()
   @Type(() => BookingEventTypeDto)

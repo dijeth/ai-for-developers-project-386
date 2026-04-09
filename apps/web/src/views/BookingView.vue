@@ -7,7 +7,7 @@ import {
   useAvailableSlots, 
   useOwner, 
   useCreateBooking,
-  toISODate 
+  toUTCDateString 
 } from '../composables/useBooking';
 import EventTypeSelection from '../components/booking/EventTypeSelection.vue';
 import SlotPicker from '../components/booking/SlotPicker.vue';
@@ -53,8 +53,8 @@ watch(
   () => [state.selectedEventType?.id, state.selectedDate],
   ([eventTypeId, date]) => {
     if (eventTypeId && date) {
-      const dateStr = toISODate(date as Date);
-      fetchSlots(eventTypeId as string, dateStr, dateStr);
+      const dateStr = toUTCDateString(date as Date);
+      fetchSlots(eventTypeId as string, dateStr);
     }
   },
   { immediate: true }
@@ -136,9 +136,8 @@ const handleCancelGuestForm = () => {
     
     <!-- Step 3: Success -->
     <BookingSuccess
-      v-else-if="state.step === 'success' && state.createdBooking && state.selectedEventType"
+      v-else-if="state.step === 'success' && state.createdBooking"
       :booking="state.createdBooking"
-      :event-type="state.selectedEventType"
       @go-home="handleGoHome"
     />
     

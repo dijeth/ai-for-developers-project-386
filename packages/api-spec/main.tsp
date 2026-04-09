@@ -181,7 +181,7 @@ model Booking {
   @key
   id: string;
 
-  eventTypeId: string;
+  eventType: EventType;
 
   /** Computed: startTime + event duration */
   endTime: utcDateTime;
@@ -246,10 +246,7 @@ model CreateBookingRequest {
  */
 model GetAvailableSlotsParams {
   @query
-  startDate: plainDate;
-
-  @query
-  endDate: plainDate;
+  forDate: utcDateTime;
 }
 
 /**
@@ -506,16 +503,15 @@ interface PublicEventTypes {
    * Get available slots for event type
    * Rules:
    * - All times are in UTC
-   * - Date range must not exceed 3 months
-   * - startDate must be today or in the future
+   * - forDate must be today or in the future
+   * - forDate must not exceed bookingMonthsAhead from today
    */
   @get
   @route("/event-types/{id}/available-slots")
   @summary("Get available slots for event type (all times in UTC)")
   getAvailableSlots(
     @path id: string,
-    @query startDate: plainDate,
-    @query endDate: plainDate
+    @query forDate: utcDateTime
   ): {
     @statusCode statusCode: 200;
     @body response: AvailableSlotsResponse;
