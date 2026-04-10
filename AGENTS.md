@@ -198,6 +198,51 @@ formatLocalTime() converts to local for display
 - Comments: Write only in English
 - CSS: Avoid `!important`, use CSS variables instead
 
+## Docker Deployment
+
+Monolithic container for MVP (Nginx + Node.js + SQLite). See `DOCKER.md` for full details.
+
+### Quick Commands
+
+```bash
+# Local development
+npm run docker:up      # Build and start on http://localhost:3000
+npm run docker:down    # Stop containers
+npm run docker:clean   # Stop and remove volumes (clears DB!)
+
+# Railway deployment
+railway login
+railway link
+railway up
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│              Nginx (Port 80)                │
+│  ┌──────────────┐      ┌──────────────────┐  │
+│  │ Static files │      │ Proxy /api/*     │  │
+│  │ (Vue build)  │──────│ → Node.js:3001   │  │
+│  └──────────────┘      └──────────────────┘  │
+└─────────────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────────────┐
+│           NestJS API (Port 3001)            │
+│                                              │
+│  • Prisma ORM + SQLite                      │
+│  • Database: /app/api/data/prod.db          │
+└─────────────────────────────────────────────┘
+```
+
+### Important Notes
+
+- **Single container**: Both nginx (port 80) and Node.js (port 3001) run together
+- **SQLite persistence**: Mount volume at `/app/api/data` in Railway for database persistence
+- **Health check**: Railway checks `GET /api/owner` on port 80
+- **Multi-stage build**: Optimized for production (see `Dockerfile`)
+
 ## Other Notes
 
 - Write in Russian in the chat, but code and comments in English
