@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { OwnerService } from '../../prisma/models/owner.service';
+import { WorkingHoursService } from '../../prisma/models/working-hours.service';
 import { EventTypeService } from '../../prisma/models/event-type.service';
 import { BookingService } from '../../prisma/models/booking.service';
 import { TimeOffService } from '../../prisma/models/time-off.service';
@@ -25,6 +26,7 @@ export class AvailableSlotsService {
 
   constructor(
     private ownerService: OwnerService,
+    private workingHoursService: WorkingHoursService,
     private eventTypeService: EventTypeService,
     private bookingService: BookingService,
     private timeOffService: TimeOffService,
@@ -51,6 +53,9 @@ export class AvailableSlotsService {
       throw new NotFoundException('Owner not found');
     }
 
+    // Get working hours schedule
+    const workingHours = await this.workingHoursService.findByOwnerId(this.ownerId);
+
     // Validate the requested date range
     this.validateDateRange(startDate, endDate, owner.bookingMonthsAhead);
 
@@ -68,6 +73,7 @@ export class AvailableSlotsService {
       startDate,
       endDate,
       owner,
+      workingHours,
       eventType.durationMinutes,
       bookings,
       timeOffs,
@@ -112,12 +118,8 @@ export class AvailableSlotsService {
   private generateSlotsForRange(
     startDate: Date,
     endDate: Date,
-    owner: {
-      workingDays: DayOfWeek[];
-      workingHoursStart: string;
-      workingHoursEnd: string;
-      timezone: string;
-    },
+    owner: { timezone: string },
+    workingHours: Array<{ weekday: string; startTime: string; endTime: string }>,
     durationMinutes: number,
     bookings: Array<{ startTime: Date; endTime: Date }>,
     timeOffs: Array<{ startDateTime: Date; endDateTime: Date }>,
@@ -130,13 +132,14 @@ export class AvailableSlotsService {
     const rangeEnd = endDate;
 
     while (isUTCBefore(currentDate, rangeEnd) || isSameUTCDay(currentDate, rangeEnd)) {
-      // Check if this day is a working day (using owner's timezone)
+      // Check if this day has working hours configured (using owner's timezone)
       const dayOfWeekNum = getDayOfWeekInTimezone(currentDate, owner.timezone);
       const dayOfWeek = this.numberToDayOfWeek(dayOfWeekNum);
-      if (owner.workingDays.includes(dayOfWeek)) {
+      const dayWorkingHours = workingHours.find((wh) => wh.weekday === dayOfWeek);
+      if (dayWorkingHours) {
         // Calculate working hours for this day in owner's timezone, converted to UTC
-        const dayWorkingStart = convertLocalTimeToUTC(currentDate, owner.workingHoursStart, owner.timezone);
-        const dayWorkingEnd = convertLocalTimeToUTC(currentDate, owner.workingHoursEnd, owner.timezone);
+        const dayWorkingStart = convertLocalTimeToUTC(currentDate, dayWorkingHours.startTime, owner.timezone);
+        const dayWorkingEnd = convertLocalTimeToUTC(currentDate, dayWorkingHours.endTime, owner.timezone);
 
         // Clamp working hours to the requested range
         const effectiveStart = isUTCAfter(dayWorkingStart, startDate)

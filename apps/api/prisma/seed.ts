@@ -8,6 +8,7 @@ async function main() {
   // Clean up existing data
   await prisma.booking.deleteMany();
   await prisma.timeOff.deleteMany();
+  await prisma.workingHours.deleteMany();
   await prisma.eventType.deleteMany();
   await prisma.owner.deleteMany();
 
@@ -25,13 +26,25 @@ async function main() {
       avatar: 'https://i.pravatar.cc/150?img=5',
       bookingMonthsAhead: 3,
       timezone: 'Europe/Moscow',
-      workingHoursStart: '09:00',
-      workingHoursEnd: '17:00',
-      workingDays: JSON.stringify(['mon', 'tue', 'wed', 'thu', 'fri']),
     },
   });
 
   console.log(`✅ Created Owner: ${owner.name} (${owner.email})`);
+
+  // ============================================================================
+  // 1.5 Create WorkingHours (mon-fri, 09:00-17:00)
+  // ============================================================================
+  await prisma.workingHours.createMany({
+    data: [
+      { weekday: 'mon', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
+      { weekday: 'tue', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
+      { weekday: 'wed', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
+      { weekday: 'thu', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
+      { weekday: 'fri', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
+    ],
+  });
+
+  console.log('✅ Created 5 WorkingHours entries (mon-fri)');
 
   // ============================================================================
   // 2. Create EventTypes (типы событий/встреч)
@@ -190,7 +203,8 @@ async function main() {
   console.log('🎉 Database seeded successfully!\n');
   console.log('Summary:');
   console.log(`  👤 Owner: ${owner.name}`);
-  console.log(`  📅 Event Types: ${eventTypes.count}`);
+  console.log(`  � Working Hours: 5 days (mon-fri)`);
+  console.log(`  �📅 Event Types: ${eventTypes.count}`);
   console.log(`  🏖️  Time Offs: ${timeOffsData.length}`);
   console.log(`  📋 Bookings: ${bookingsData.length}`);
   console.log('\n📌 Prisma Studio: npm run db:studio (opens at http://localhost:5555)');

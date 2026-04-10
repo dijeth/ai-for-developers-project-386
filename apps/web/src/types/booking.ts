@@ -26,12 +26,15 @@ export interface Booking {
 export interface PublicOwner {
   name: string;
   description?: string;
-  workingHours: {
-    startTime: string;
-    endTime: string;
-    workingDays: string[];
-  };
   bookingMonthsAhead: number;
+  timezone: string;
+}
+
+export interface WorkingHours {
+  id: string;
+  weekday: string;
+  startTime: string;
+  endTime: string;
 }
 
 export interface CreateBookingRequest {

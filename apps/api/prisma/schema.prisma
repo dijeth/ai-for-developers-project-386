@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Weekday enum (matches DayOfWeek values used throughout the app)
+enum Weekday {
+  mon
+  tue
+  wed
+  thu
+  fri
+  sat
+  sun
+}
+
 // ============================================================================
 // Owner (Calendar owner) - singleton
 // ============================================================================
@@ -20,18 +31,33 @@ model Owner {
   bookingMonthsAhead Int      @default(3) // 1-12 months
 
   // Timezone for the owner (e.g., Europe/Moscow, America/New_York)
-  timezone             String   @default("Europe/Moscow")
+  timezone           String   @default("Europe/Moscow")
 
-  // WorkingHours are embedded in Owner (not a separate table)
-  workingHoursStart  String   @default("09:00") // format HH:MM
-  workingHoursEnd    String   @default("17:00") // format HH:MM
-  workingDays        String   @default("[\"mon\",\"tue\",\"wed\",\"thu\",\"fri\"]") // JSON array of DayOfWeek
-
-  // Relation to TimeOff (one-to-many)
+  // Relations
+  workingHours       WorkingHours[]
   timeOffs           TimeOff[]
 
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+}
+
+// ============================================================================
+// WorkingHours (per-weekday schedule)
+// ============================================================================
+
+model WorkingHours {
+  id        String   @id @default(cuid())
+  weekday   Weekday
+  startTime String   // format HH:MM
+  endTime   String   // format HH:MM
+
+  owner     Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId   String   @default("owner")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([weekday, ownerId])
 }
 
 // ============================================================================

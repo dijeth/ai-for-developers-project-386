@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue';
-import type { Booking, Owner, WorkingHoursTimeOff, BookingStats, DateRangeFilter } from '../types/admin';
+import type { Booking, Owner, WorkingHours, WorkingHoursTimeOff, BookingStats, DateRangeFilter } from '../types/admin';
 import { fromISO } from '@calendar/date-utils';
 import {
   isSameLocalDay,
@@ -133,6 +133,38 @@ export function useAdminTimeOffs() {
     isLoading,
     error,
     fetchTimeOffs
+  };
+}
+
+export function useAdminWorkingHours() {
+  const workingHours = ref<WorkingHours[]>([]);
+  const isLoading = ref(false);
+  const error = ref<string | null>(null);
+
+  const fetchWorkingHours = async () => {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/working-hours`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch working hours');
+      }
+      workingHours.value = await response.json();
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Unknown error';
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const workingDays = computed(() => workingHours.value.map((wh) => wh.weekday));
+
+  return {
+    workingHours,
+    workingDays,
+    isLoading,
+    error,
+    fetchWorkingHours
   };
 }
 

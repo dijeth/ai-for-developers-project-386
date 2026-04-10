@@ -12,10 +12,10 @@ export interface WorkingHoursTimeOff {
 }
 
 export interface WorkingHours {
+  id: string;
+  weekday: DayOfWeek;
   startTime: string;
   endTime: string;
-  workingDays: DayOfWeek[];
-  timeOffs: WorkingHoursTimeOff[];
 }
 
 export interface Owner {
@@ -26,8 +26,51 @@ export interface Owner {
   bookingMonthsAhead?: number;
   /** Timezone for displaying dates (IANA format) */
   timezone: string;
-  workingHours: WorkingHours;
 }
+
+export interface EventType {
+  id: string;
+  title: string;
+  durationMinutes: number;
+}
+
+export interface Guest {
+  name: string;
+  email: string;
+}
+
+export interface Booking {
+  id: string;
+  eventType: EventType;
+  startTime: string;
+  endTime: string;
+  guest: Guest;
+}
+
+export interface BookingListResponse {
+  bookings: Booking[];
+}
+
+export interface TimeOffListResponse {
+  timeOffs: WorkingHoursTimeOff[];
+}
+
+export interface WorkingHoursListResponse {
+  workingHours: WorkingHours[];
+}
+
+export interface BookingStats {
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+  totalDurationToday: number; // in minutes
+}
+
+export interface DateRangeFilter {
+  dateFrom: string;
+  dateTo: string;
+}
+
 
 export interface EventType {
   id: string;

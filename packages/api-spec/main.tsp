@@ -35,20 +35,19 @@ enum DayOfWeek {
 }
 
 /**
- * Working hours configuration
+ * Working hours entry for a specific weekday
  */
 model WorkingHours {
+  @key
+  id: string;
+
+  weekday: DayOfWeek;
+
   @pattern("^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
   startTime: string;
 
   @pattern("^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
   endTime: string;
-
-  /** Unique working days (no duplicates allowed) */
-  workingDays: DayOfWeek[];
-
-  /** TimeOffs from standard working hours (vacations, days off) */
-  timeOffs: WorkingHoursTimeOff[];
 }
 
 /**
@@ -114,8 +113,6 @@ model Owner {
   /** Timezone for displaying dates (IANA format) */
   @example("Europe/Moscow")
   timezone: string;
-
-  workingHours: WorkingHours;
 }
 
 /**
@@ -141,17 +138,6 @@ model PublicOwner {
   /** Timezone for displaying dates (IANA format) */
   @example("Europe/Moscow")
   timezone: string;
-
-  /** Working hours for display (excludes time-offs details) */
-  workingHours: {
-    @pattern("^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
-    startTime: string;
-
-    @pattern("^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
-    endTime: string;
-
-    workingDays: DayOfWeek[];
-  };
 }
 
 /**
@@ -284,7 +270,7 @@ model AvailableSlotsResponse {
 }
 
 /**
- * Update working hours request
+ * Update working hours request (partial)
  */
 model UpdateOwnerRequest {
   @minLength(1)
@@ -308,8 +294,37 @@ model UpdateOwnerRequest {
   /** Timezone for displaying dates (IANA format) */
   @example("Europe/Moscow")
   timezone?: string;
+}
 
-  workingHours?: WorkingHours;
+/**
+ * Create working hours entry request
+ */
+model CreateWorkingHoursRequest {
+  weekday: DayOfWeek;
+
+  @pattern("^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
+  startTime: string;
+
+  @pattern("^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
+  endTime: string;
+}
+
+/**
+ * Update working hours entry request (partial)
+ */
+model UpdateWorkingHoursRequest {
+  @pattern("^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
+  startTime?: string;
+
+  @pattern("^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
+  endTime?: string;
+}
+
+/**
+ * Working hours list response
+ */
+model WorkingHoursListResponse {
+  workingHours: WorkingHours[];
 }
 
 // ============================================================================
@@ -427,7 +442,7 @@ interface AdminBookings {
 }
 
 @route("/api/admin")
-@tag("Admin - Working Hours")
+@tag("Admin - Owner & Working Hours")
 interface AdminWorkingHours {
   @get
   @route("/owner")
@@ -445,6 +460,55 @@ interface AdminWorkingHours {
     @body owner: Owner;
   } | {
     @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  };
+
+  @get
+  @route("/owner/working-hours")
+  @summary("List working hours schedule (one entry per weekday)")
+  listWorkingHours(): {
+    @statusCode statusCode: 200;
+    @body response: WorkingHoursListResponse;
+  };
+
+  @post
+  @route("/owner/working-hours")
+  @summary("Create working hours entry for a weekday")
+  createWorkingHours(@body request: CreateWorkingHoursRequest): {
+    @statusCode statusCode: 201;
+    @body workingHours: WorkingHours;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 409;
+    @body error: ErrorResponse;
+  };
+
+  @put
+  @route("/owner/working-hours/{weekday}")
+  @summary("Update working hours for a specific weekday")
+  updateWorkingHours(
+    @path weekday: DayOfWeek,
+    @body request: UpdateWorkingHoursRequest
+  ): {
+    @statusCode statusCode: 200;
+    @body workingHours: WorkingHours;
+  } | {
+    @statusCode statusCode: 404;
+    @body error: ErrorResponse;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
+  };
+
+  @delete
+  @route("/owner/working-hours/{weekday}")
+  @summary("Delete working hours for a specific weekday")
+  deleteWorkingHours(@path weekday: DayOfWeek): {
+    @statusCode statusCode: 204;
+  } | {
+    @statusCode statusCode: 404;
     @body error: ErrorResponse;
   };
 
@@ -517,6 +581,14 @@ interface PublicOwnerProfile {
   getPublicOwner(): {
     @statusCode statusCode: 200;
     @body owner: PublicOwner;
+  };
+
+  @get
+  @route("/owner/working-hours")
+  @summary("Get owner's working hours schedule")
+  getPublicWorkingHours(): {
+    @statusCode statusCode: 200;
+    @body response: WorkingHoursListResponse;
   };
 }
 

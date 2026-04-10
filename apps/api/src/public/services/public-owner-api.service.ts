@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { OwnerService } from '../../prisma/models/owner.service';
 import { PublicOwnerDto } from '../../dto/owner/public-owner.dto';
-import { DayOfWeek } from '../../common/enums/day-of-week.enum';
 
 @Injectable()
 export class PublicOwnerApiService {
@@ -25,9 +24,6 @@ export class PublicOwnerApiService {
     avatar: string | null;
     bookingMonthsAhead: number;
     timezone: string;
-    workingHoursStart: string;
-    workingHoursEnd: string;
-    workingDays: DayOfWeek[];
   }): PublicOwnerDto {
     return {
       name: owner.name,
@@ -35,11 +31,7 @@ export class PublicOwnerApiService {
       avatar: owner.avatar ?? undefined,
       bookingMonthsAhead: owner.bookingMonthsAhead,
       timezone: owner.timezone,
-      workingHours: {
-        startTime: owner.workingHoursStart,
-        endTime: owner.workingHoursEnd,
-        workingDays: owner.workingDays,
-      },
     };
   }
 }
+

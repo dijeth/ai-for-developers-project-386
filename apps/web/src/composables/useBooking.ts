@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue';
-import type { EventType, AvailableSlot, PublicOwner, Booking, CreateBookingRequest } from '../types/booking';
+import type { EventType, AvailableSlot, PublicOwner, WorkingHours, Booking, CreateBookingRequest } from '../types/booking';
 import {
   formatTimeRange,
   addMonths
@@ -106,6 +106,38 @@ export function useOwner() {
     error,
     fetchOwner,
     maxBookingDate
+  };
+}
+
+export function useWorkingHours() {
+  const workingHours = ref<WorkingHours[]>([]);
+  const isLoading = ref(false);
+  const error = ref<string | null>(null);
+
+  const fetchWorkingHours = async () => {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await fetch(`${API_BASE_URL}/owner/working-hours`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch working hours');
+      }
+      workingHours.value = await response.json();
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Unknown error';
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const workingDays = computed(() => workingHours.value.map((wh) => wh.weekday));
+
+  return {
+    workingHours,
+    workingDays,
+    isLoading,
+    error,
+    fetchWorkingHours
   };
 }
 

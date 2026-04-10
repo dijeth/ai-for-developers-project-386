@@ -11,7 +11,7 @@ info:
 tags:
   - name: Admin - Event Types
   - name: Admin - Bookings
-  - name: Admin - Working Hours
+  - name: Admin - Owner & Working Hours
   - name: Public - Owner
   - name: Public - Event Types
   - name: Public - Bookings
@@ -188,7 +188,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Owner'
       tags:
-        - Admin - Working Hours
+        - Admin - Owner & Working Hours
     put:
       operationId: AdminWorkingHours_updateOwner
       summary: Update owner profile
@@ -207,7 +207,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
       tags:
-        - Admin - Working Hours
+        - Admin - Owner & Working Hours
       requestBody:
         required: true
         content:
@@ -239,7 +239,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
       tags:
-        - Admin - Working Hours
+        - Admin - Owner & Working Hours
       requestBody:
         required: true
         content:
@@ -260,7 +260,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/WorkingHoursTimeOff'
       tags:
-        - Admin - Working Hours
+        - Admin - Owner & Working Hours
   /api/admin/owner/time-offs/{id}:
     put:
       operationId: AdminWorkingHours_updateTimeOff
@@ -297,7 +297,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
       tags:
-        - Admin - Working Hours
+        - Admin - Owner & Working Hours
       requestBody:
         required: true
         content:
@@ -329,7 +329,109 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
       tags:
-        - Admin - Working Hours
+        - Admin - Owner & Working Hours
+  /api/admin/owner/working-hours:
+    get:
+      operationId: AdminWorkingHours_listWorkingHours
+      summary: List working hours schedule (one entry per weekday)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkingHoursListResponse'
+      tags:
+        - Admin - Owner & Working Hours
+    post:
+      operationId: AdminWorkingHours_createWorkingHours
+      summary: Create working hours entry for a weekday
+      parameters: []
+      responses:
+        '201':
+          description: The request has succeeded and a new resource has been created as a result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkingHours'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      tags:
+        - Admin - Owner & Working Hours
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkingHoursRequest'
+  /api/admin/owner/working-hours/{weekday}:
+    put:
+      operationId: AdminWorkingHours_updateWorkingHours
+      summary: Update working hours for a specific weekday
+      parameters:
+        - name: weekday
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/DayOfWeek'
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkingHours'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      tags:
+        - Admin - Owner & Working Hours
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkingHoursRequest'
+    delete:
+      operationId: AdminWorkingHours_deleteWorkingHours
+      summary: Delete working hours for a specific weekday
+      parameters:
+        - name: weekday
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/DayOfWeek'
+      responses:
+        '204':
+          description: 'There is no content to send for this request, but the headers may be useful. '
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      tags:
+        - Admin - Owner & Working Hours
   /api/bookings:
     post:
       operationId: PublicBookings_createBooking
@@ -486,6 +588,20 @@ paths:
                 $ref: '#/components/schemas/PublicOwner'
       tags:
         - Public - Owner
+  /api/owner/working-hours:
+    get:
+      operationId: PublicOwnerProfile_getPublicWorkingHours
+      summary: Get owner's working hours schedule
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkingHoursListResponse'
+      tags:
+        - Public - Owner
 components:
   schemas:
     AvailableSlot:
@@ -590,6 +706,22 @@ components:
           format: date-time
           description: TimeOff period end (datetime in UTC)
       description: Create time-off request (id generated by server)
+    CreateWorkingHoursRequest:
+      type: object
+      required:
+        - weekday
+        - startTime
+        - endTime
+      properties:
+        weekday:
+          $ref: '#/components/schemas/DayOfWeek'
+        startTime:
+          type: string
+          pattern: ^([0-1][0-9]|2[0-3]):[0-5][0-9]$
+        endTime:
+          type: string
+          pattern: ^([0-1][0-9]|2[0-3]):[0-5][0-9]$
+      description: Create working hours entry request
     DayOfWeek:
       type: string
       enum:
@@ -692,7 +824,6 @@ components:
         - name
         - email
         - timezone
-        - workingHours
       properties:
         name:
           type: string
@@ -721,15 +852,12 @@ components:
           description: Timezone for displaying dates (IANA format)
           examples:
             - Europe/Moscow
-        workingHours:
-          $ref: '#/components/schemas/WorkingHours'
       description: Calendar owner profile (static, single owner)
     PublicOwner:
       type: object
       required:
         - name
         - timezone
-        - workingHours
       properties:
         name:
           type: string
@@ -755,24 +883,6 @@ components:
           description: Timezone for displaying dates (IANA format)
           examples:
             - Europe/Moscow
-        workingHours:
-          type: object
-          properties:
-            startTime:
-              type: string
-              pattern: ^([0-1][0-9]|2[0-3]):[0-5][0-9]$
-            endTime:
-              type: string
-              pattern: ^([0-1][0-9]|2[0-3]):[0-5][0-9]$
-            workingDays:
-              type: array
-              items:
-                $ref: '#/components/schemas/DayOfWeek'
-          required:
-            - startTime
-            - endTime
-            - workingDays
-          description: Working hours for display (excludes time-offs details)
       description: Public owner profile (without sensitive data)
     UpdateEventTypeRequest:
       type: object
@@ -815,9 +925,7 @@ components:
           description: Timezone for displaying dates (IANA format)
           examples:
             - Europe/Moscow
-        workingHours:
-          $ref: '#/components/schemas/WorkingHours'
-      description: Update working hours request
+      description: Update working hours request (partial)
     UpdateTimeOffRequest:
       type: object
       properties:
@@ -830,13 +938,8 @@ components:
           format: date-time
           description: TimeOff period end (datetime in UTC)
       description: Update time-off request (partial update)
-    WorkingHours:
+    UpdateWorkingHoursRequest:
       type: object
-      required:
-        - startTime
-        - endTime
-        - workingDays
-        - timeOffs
       properties:
         startTime:
           type: string
@@ -844,17 +947,36 @@ components:
         endTime:
           type: string
           pattern: ^([0-1][0-9]|2[0-3]):[0-5][0-9]$
-        workingDays:
+      description: Update working hours entry request (partial)
+    WorkingHours:
+      type: object
+      required:
+        - id
+        - weekday
+        - startTime
+        - endTime
+      properties:
+        id:
+          type: string
+        weekday:
+          $ref: '#/components/schemas/DayOfWeek'
+        startTime:
+          type: string
+          pattern: ^([0-1][0-9]|2[0-3]):[0-5][0-9]$
+        endTime:
+          type: string
+          pattern: ^([0-1][0-9]|2[0-3]):[0-5][0-9]$
+      description: Working hours entry for a specific weekday
+    WorkingHoursListResponse:
+      type: object
+      required:
+        - workingHours
+      properties:
+        workingHours:
           type: array
           items:
-            $ref: '#/components/schemas/DayOfWeek'
-          description: Unique working days (no duplicates allowed)
-        timeOffs:
-          type: array
-          items:
-            $ref: '#/components/schemas/WorkingHoursTimeOff'
-          description: TimeOffs from standard working hours (vacations, days off)
-      description: Working hours configuration
+            $ref: '#/components/schemas/WorkingHours'
+      description: Working hours list response
     WorkingHoursTimeOff:
       type: object
       required:

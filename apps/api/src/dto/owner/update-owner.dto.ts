@@ -8,26 +8,7 @@ import {
   MaxLength,
   Min,
   MinLength,
-  ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { IsTimeString } from '../validators/time-string.validator';
-import { IsDayOfWeekArray } from '../validators/day-of-week-array.validator';
-import { DayOfWeek } from '../../common/enums/day-of-week.enum';
-
-export class WorkingHoursUpdateDto {
-  @IsTimeString()
-  @IsOptional()
-  startTime?: string;
-
-  @IsTimeString()
-  @IsOptional()
-  endTime?: string;
-
-  @IsDayOfWeekArray()
-  @IsOptional()
-  workingDays?: DayOfWeek[];
-}
 
 export class UpdateOwnerDto {
   @IsString()
@@ -57,9 +38,4 @@ export class UpdateOwnerDto {
   @IsString()
   @IsOptional()
   timezone?: string;
-
-  @ValidateNested()
-  @Type(() => WorkingHoursUpdateDto)
-  @IsOptional()
-  workingHours?: WorkingHoursUpdateDto;
 }
