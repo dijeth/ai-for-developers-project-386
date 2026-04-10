@@ -15,6 +15,8 @@ interface Props {
   workingDays?: string[];
   markedDates?: Set<string>;
   markerType?: 'primary' | 'success';
+  ownerName: string;
+  ownerAvatar?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -73,6 +75,8 @@ const calendarDate = computed({
           :event-type="eventType"
           :selected-date="selectedDate"
           :selected-slot="selectedSlot"
+          :owner-name="ownerName"
+          :owner-avatar="ownerAvatar"
         />
       </div>
       

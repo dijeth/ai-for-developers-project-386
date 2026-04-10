@@ -1,13 +1,19 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { EventType } from '../../types/booking';
 import EventTypeCard from './EventTypeCard.vue';
 
 interface Props {
   eventTypes: EventType[];
   ownerName: string;
+  ownerAvatar?: string;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
+
+const avatarUrl = computed(() => {
+  return props.ownerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tota';
+});
 
 const emit = defineEmits<{
   select: [eventType: EventType];
@@ -24,7 +30,7 @@ const handleSelect = (eventType: EventType) => {
       <div class="header-content">
         <div class="avatar-row">
           <div class="avatar">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Tota" alt="Tota" />
+            <img :src="avatarUrl" :alt="ownerName" />
           </div>
           <div class="user-info">
             <span class="name">{{ ownerName }}</span>

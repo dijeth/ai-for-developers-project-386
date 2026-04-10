@@ -26,6 +26,7 @@ export interface Booking {
 export interface PublicOwner {
   name: string;
   description?: string;
+  avatar?: string;
   bookingMonthsAhead: number;
   timezone: string;
 }

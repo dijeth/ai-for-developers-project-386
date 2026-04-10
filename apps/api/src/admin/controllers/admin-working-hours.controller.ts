@@ -12,6 +12,7 @@ import {
 import { WorkingHoursApiService } from '../services/working-hours-api.service';
 import { CreateWorkingHoursDto } from '../../dto/working-hours/create-working-hours.dto';
 import { UpdateWorkingHoursDto } from '../../dto/working-hours/update-working-hours.dto';
+import { BulkReplaceWorkingHoursDto } from '../../dto/working-hours/bulk-replace-working-hours.dto';
 import { WorkingHoursDto } from '../../dto/working-hours/working-hours.dto';
 import { WorkingHoursListResponseDto } from '../../dto/working-hours/working-hours-list-response.dto';
 import { DayOfWeek } from '../../common/enums/day-of-week.enum';
@@ -25,6 +26,12 @@ export class AdminWorkingHoursController {
   @Get()
   async listWorkingHours(): Promise<WorkingHoursListResponseDto> {
     const workingHours = await this.workingHoursApiService.listWorkingHours(this.ownerId);
+    return { workingHours };
+  }
+
+  @Put()
+  async replaceWorkingHours(@Body() dto: BulkReplaceWorkingHoursDto): Promise<WorkingHoursListResponseDto> {
+    const workingHours = await this.workingHoursApiService.replaceWorkingHours(this.ownerId, dto);
     return { workingHours };
   }
 

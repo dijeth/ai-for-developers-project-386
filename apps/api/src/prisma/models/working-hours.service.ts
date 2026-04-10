@@ -41,4 +41,22 @@ export class WorkingHoursService {
       where: { weekday_ownerId: { weekday, ownerId } },
     });
   }
+
+  async replaceAll(
+    ownerId: string,
+    entries: { weekday: Weekday; startTime: string; endTime: string }[],
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.workingHours.deleteMany({ where: { ownerId } });
+      if (entries.length > 0) {
+        await tx.workingHours.createMany({
+          data: entries.map((e) => ({ ...e, ownerId })),
+        });
+      }
+      return tx.workingHours.findMany({
+        where: { ownerId },
+        orderBy: { weekday: 'asc' },
+      });
+    });
+  }
 }

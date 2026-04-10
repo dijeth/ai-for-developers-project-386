@@ -80,7 +80,7 @@ export function useAdminOwner() {
     try {
       const response = await fetch(`${ADMIN_API_BASE_URL}/owner`);
       if (!response.ok) {
-        throw new Error('Failed to fetch owner');
+        throw new Error(`Failed to fetch owner: ${response.status}`);
       }
       const data = await response.json();
       owner.value = data;
@@ -97,11 +97,35 @@ export function useAdminOwner() {
     return addMonths(new Date(), months);
   });
 
+  const updateOwner = async (updates: Partial<Owner>) => {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await fetch(`${ADMIN_API_BASE_URL}/owner`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update owner');
+      }
+      const data = await response.json();
+      owner.value = data;
+      return data;
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Unknown error';
+      throw e;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
   return {
     owner,
     isLoading,
     error,
     fetchOwner,
+    updateOwner,
     maxBookingDate
   };
 }
@@ -147,7 +171,7 @@ export function useAdminWorkingHours() {
     try {
       const response = await fetch(`${ADMIN_API_BASE_URL}/owner/working-hours`);
       if (!response.ok) {
-        throw new Error('Failed to fetch working hours');
+        throw new Error(`Failed to fetch working hours: ${response.status}`);
       }
       const data = await response.json();
       workingHours.value = data.workingHours;
@@ -160,12 +184,58 @@ export function useAdminWorkingHours() {
 
   const workingDays = computed(() => workingHours.value.map((wh) => wh.weekday));
 
+  const updateWorkingHours = async (weekday: string, updates: { startTime?: string; endTime?: string }) => {
+    error.value = null;
+    try {
+      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/working-hours/${weekday}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to update working hours for ${weekday}`);
+      }
+      const data = await response.json();
+      // Update local state
+      const index = workingHours.value.findIndex((wh) => wh.weekday === weekday);
+      if (index >= 0) {
+        workingHours.value[index] = data.workingHours;
+      }
+      return data;
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Unknown error';
+      throw e;
+    }
+  };
+
+  const replaceWorkingHours = async (entries: { weekday: string; startTime: string; endTime: string }[]) => {
+    error.value = null;
+    try {
+      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/working-hours`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workingHours: entries })
+      });
+      if (!response.ok) {
+        throw new Error('Failed to save working hours');
+      }
+      const data = await response.json();
+      workingHours.value = data.workingHours;
+      return data;
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Unknown error';
+      throw e;
+    }
+  };
+
   return {
     workingHours,
     workingDays,
     isLoading,
     error,
-    fetchWorkingHours
+    fetchWorkingHours,
+    updateWorkingHours,
+    replaceWorkingHours
   };
 }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import Button from "primevue/button";
 import Menu from "primevue/menu";
 import type { Booking } from "../types/admin";
@@ -17,6 +18,8 @@ import BookingStatsCards from "../components/admin/BookingStatsCards.vue";
 import BookingTable from "../components/admin/BookingTable.vue";
 import BaseCalendar from "../components/common/BaseCalendar.vue";
 import ConfirmDialog from "../components/admin/ConfirmDialog.vue";
+
+const router = useRouter();
 
 // Reactive state
 const selectedDate = ref(new Date());
@@ -178,7 +181,7 @@ onMounted(async () => {
 
 // Handlers
 const handleEditProfile = () => {
-  console.log("[MOCK] Edit profile clicked");
+  router.push({ name: "ProfileSettings" });
 };
 
 const handleMonthChange = async (newMonthDate: Date) => {

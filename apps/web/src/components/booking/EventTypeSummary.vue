@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { EventType, AvailableSlot } from '../../types/booking';
 import { formatDate, formatSlotTime } from '../../composables/useBooking';
 
@@ -6,9 +7,15 @@ interface Props {
   eventType: EventType;
   selectedDate: Date | null;
   selectedSlot: AvailableSlot | null;
+  ownerName: string;
+  ownerAvatar?: string;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
+
+const avatarUrl = computed(() => {
+  return props.ownerAvatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tota';
+});
 </script>
 
 <template>
@@ -16,10 +23,10 @@ defineProps<Props>();
     <div class="card-content">
       <div class="header-row">
         <div class="avatar">
-          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Tota" alt="Tota" />
+          <img :src="avatarUrl" :alt="ownerName" />
         </div>
         <div class="user-info">
-          <span class="name">Tota</span>
+          <span class="name">{{ ownerName }}</span>
           <span class="role">Host</span>
         </div>
       </div>

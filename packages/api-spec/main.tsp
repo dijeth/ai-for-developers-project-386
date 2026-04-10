@@ -297,6 +297,13 @@ model UpdateOwnerRequest {
 }
 
 /**
+ * Bulk replace working hours request (replaces all entries for the owner)
+ */
+model BulkReplaceWorkingHoursRequest {
+  workingHours: CreateWorkingHoursRequest[];
+}
+
+/**
  * Create working hours entry request
  */
 model CreateWorkingHoursRequest {
@@ -469,6 +476,17 @@ interface AdminWorkingHours {
   listWorkingHours(): {
     @statusCode statusCode: 200;
     @body response: WorkingHoursListResponse;
+  };
+
+  @put
+  @route("/owner/working-hours")
+  @summary("Bulk replace all working hours (replaces entire schedule)")
+  replaceWorkingHours(@body request: BulkReplaceWorkingHoursRequest): {
+    @statusCode statusCode: 200;
+    @body response: WorkingHoursListResponse;
+  } | {
+    @statusCode statusCode: 400;
+    @body error: ErrorResponse;
   };
 
   @post

@@ -344,6 +344,31 @@ paths:
                 $ref: '#/components/schemas/WorkingHoursListResponse'
       tags:
         - Admin - Owner & Working Hours
+    put:
+      operationId: AdminWorkingHours_replaceWorkingHours
+      summary: Bulk replace all working hours (replaces entire schedule)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkingHoursListResponse'
+        '400':
+          description: The server could not understand the request due to invalid syntax.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      tags:
+        - Admin - Owner & Working Hours
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkReplaceWorkingHoursRequest'
     post:
       operationId: AdminWorkingHours_createWorkingHours
       summary: Create working hours entry for a weekday
@@ -660,6 +685,16 @@ components:
           items:
             $ref: '#/components/schemas/Booking'
       description: Booking list response (no pagination)
+    BulkReplaceWorkingHoursRequest:
+      type: object
+      required:
+        - workingHours
+      properties:
+        workingHours:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateWorkingHoursRequest'
+      description: Bulk replace working hours request (replaces all entries for the owner)
     CreateBookingRequest:
       type: object
       required:

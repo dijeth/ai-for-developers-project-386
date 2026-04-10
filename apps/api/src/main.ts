@@ -24,6 +24,8 @@ async function bootstrap() {
   // Global exception filter for TypeSpec error format
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  await app.listen(3001);
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
+  await app.listen(port);
+  console.log(`Application is running on: http://localhost:${port}`);
 }
 bootstrap();

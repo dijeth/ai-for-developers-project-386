@@ -4,6 +4,7 @@ import { WorkingHoursService } from '../../prisma/models/working-hours.service';
 import { WorkingHoursDto } from '../../dto/working-hours/working-hours.dto';
 import { CreateWorkingHoursDto } from '../../dto/working-hours/create-working-hours.dto';
 import { UpdateWorkingHoursDto } from '../../dto/working-hours/update-working-hours.dto';
+import { BulkReplaceWorkingHoursDto } from '../../dto/working-hours/bulk-replace-working-hours.dto';
 import { DayOfWeek } from '../../common/enums/day-of-week.enum';
 
 @Injectable()
@@ -50,6 +51,16 @@ export class WorkingHoursApiService {
       throw new NotFoundException(`Working hours for ${weekday} not found`);
     }
     await this.workingHoursService.delete(ownerId, prismaWeekday);
+  }
+
+  async replaceWorkingHours(ownerId: string, dto: BulkReplaceWorkingHoursDto): Promise<WorkingHoursDto[]> {
+    const entries = dto.workingHours.map((item) => ({
+      weekday: item.weekday as unknown as Weekday,
+      startTime: item.startTime,
+      endTime: item.endTime,
+    }));
+    const records = await this.workingHoursService.replaceAll(ownerId, entries);
+    return records.map(this.mapToDto);
   }
 
   private mapToDto(record: {

@@ -62,6 +62,7 @@ const guestForm = reactive<Guest>({
 });
 
 const ownerName = computed(() => owner.value?.name || "");
+const ownerAvatar = computed(() => owner.value?.avatar);
 
 // Get set of dates that have available slots (for calendar markers)
 const datesWithSlots = computed(() => {
@@ -211,6 +212,7 @@ const handleCancelGuestForm = () => {
       v-if="state.step === 'event-type'"
       :event-types="eventTypes"
       :owner-name="ownerName"
+      :owner-avatar="ownerAvatar"
       @select="handleEventTypeSelect"
     />
 
@@ -226,6 +228,8 @@ const handleCancelGuestForm = () => {
       :working-days="workingDays"
       :marked-dates="datesWithSlots"
       marker-type="success"
+      :owner-name="ownerName"
+      :owner-avatar="ownerAvatar"
       @back="handleBackToEventTypes"
       @continue="handleContinue"
       @month-change="handleMonthChange"
