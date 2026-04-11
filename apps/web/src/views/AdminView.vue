@@ -77,6 +77,12 @@ const toggleMenu = (event: Event) => {
   menuRef.value?.toggle(event);
 };
 
+const handleCalendarActionsClick = (event: Event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  toggleMenu(event);
+};
+
 // Get set of dates that have bookings (only future/present, not past)
 const datesWithBookings = computed(() => {
   const dates = new Set<string>();
@@ -271,7 +277,7 @@ const confirmCancelBooking = async () => {
                   severity="secondary"
                   text
                   size="small"
-                  @click="toggleMenu"
+                  @click="handleCalendarActionsClick"
                 />
                 <Menu ref="menuRef" :model="menuItems" popup />
               </div>

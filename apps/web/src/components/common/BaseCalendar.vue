@@ -95,6 +95,11 @@ const handleDateSelect = (date: Date) => {
 const calendarMaxDate = computed(() => {
   return props.maxDate || undefined;
 });
+
+// Key to force re-render of date slots when markedDates changes
+const markedDatesKey = computed(() => {
+  return Array.from(props.markedDates).sort().join(',');
+});
 </script>
 
 <template>
@@ -111,9 +116,10 @@ const calendarMaxDate = computed(() => {
       class="base-calendar"
     >
       <template #date="{ date }">
-        <span 
-          class="calendar-date" 
-          :class="{ 
+        <span
+          :key="`${date.year}-${date.month}-${date.day}-${markedDatesKey}`"
+          class="calendar-date"
+          :class="{
             'has-marker': hasMarker(date.year, date.month, date.day),
             'marker-type-primary': hasMarker(date.year, date.month, date.day) && markerType === 'primary',
             'marker-type-success': hasMarker(date.year, date.month, date.day) && markerType === 'success',

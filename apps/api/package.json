@@ -14,6 +14,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "db:script": "tsx prisma/script.ts",
     "postinstall": "prisma generate",
     "test": "jest",
     "test:watch": "jest --watch",

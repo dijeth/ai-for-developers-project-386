@@ -135,18 +135,119 @@ export function useAdminTimeOffs() {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  const getApiErrorMessage = async (
+    response: Response,
+    fallback: string
+  ): Promise<string> => {
+    try {
+      const data = await response.json();
+      if (typeof data?.message === 'string') {
+        return data.message;
+      }
+      if (Array.isArray(data?.message)) {
+        return data.message.join(', ');
+      }
+      return fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
   const fetchTimeOffs = async () => {
     isLoading.value = true;
     error.value = null;
     try {
       const response = await fetch(`${ADMIN_API_BASE_URL}/owner/time-offs`);
       if (!response.ok) {
-        throw new Error('Failed to fetch time-offs');
+        throw new Error(await getApiErrorMessage(response, 'Failed to fetch time-offs'));
       }
       const data = await response.json();
-      timeOffs.value = data.timeOffs;
+      timeOffs.value = Array.isArray(data) ? data : data.timeOffs;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
+      throw e;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const createTimeOff = async (payload: {
+    startDateTime: string;
+    endDateTime: string;
+  }) => {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/time-offs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(await getApiErrorMessage(response, 'Failed to create time-off'));
+      }
+
+      const data = await response.json();
+      timeOffs.value = [...timeOffs.value, data];
+      return data;
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Unknown error';
+      throw e;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const updateTimeOff = async (
+    id: string,
+    payload: {
+      startDateTime?: string;
+      endDateTime?: string;
+    }
+  ) => {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/time-offs/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(await getApiErrorMessage(response, 'Failed to update time-off'));
+      }
+
+      const data = await response.json();
+      timeOffs.value = timeOffs.value.map((item) =>
+        item.id === id ? data : item
+      );
+      return data;
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Unknown error';
+      throw e;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const deleteTimeOff = async (id: string) => {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/time-offs/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        throw new Error(await getApiErrorMessage(response, 'Failed to delete time-off'));
+      }
+
+      timeOffs.value = timeOffs.value.filter((item) => item.id !== id);
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Unknown error';
+      throw e;
     } finally {
       isLoading.value = false;
     }
@@ -156,7 +257,10 @@ export function useAdminTimeOffs() {
     timeOffs,
     isLoading,
     error,
-    fetchTimeOffs
+    fetchTimeOffs,
+    createTimeOff,
+    updateTimeOff,
+    deleteTimeOff
   };
 }
 

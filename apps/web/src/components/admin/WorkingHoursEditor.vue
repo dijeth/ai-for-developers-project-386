@@ -197,10 +197,6 @@ const handleSave = async () => {
                 isLoading || isSubmitting || !daySchedules.get(day)?.isEnabled
               "
             />
-            <div class="slider-hint">
-              Перемещайте ползунки для установки времени работы (от 00:00 до
-              24:00)
-            </div>
           </div>
         </div>
       </div>
@@ -287,12 +283,6 @@ const handleSave = async () => {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-.slider-hint {
-  font-size: 0.75rem;
-  color: var(--text-color-secondary);
-  margin-top: 0.5rem;
 }
 
 /* Disabled slider styling */

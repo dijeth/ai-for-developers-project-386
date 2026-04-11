@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -23,7 +23,7 @@ async function main() {
       name: 'Dr. Sarah Johnson',
       email: 'sarah.johnson@example.com',
       description: 'Senior Software Architect & Tech Lead with 10+ years of experience in building scalable systems. Available for architecture reviews, code reviews, and mentorship sessions.',
-      avatar: 'https://i.pravatar.cc/150?img=5',
+      avatar: 'https://i.pravatar.cc/150?img=3',
       bookingMonthsAhead: 3,
       timezone: 'Europe/Moscow',
     },
@@ -34,14 +34,16 @@ async function main() {
   // ============================================================================
   // 1.5 Create WorkingHours (mon-fri, 09:00-17:00)
   // ============================================================================
+  const workingHoursData: Prisma.WorkingHoursCreateManyInput[] = [
+    { weekday: 'mon', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
+    { weekday: 'tue', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
+    { weekday: 'wed', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
+    { weekday: 'thu', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
+    { weekday: 'fri', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
+  ];
+
   await prisma.workingHours.createMany({
-    data: [
-      { weekday: 'mon', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
-      { weekday: 'tue', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
-      { weekday: 'wed', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
-      { weekday: 'thu', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
-      { weekday: 'fri', startTime: '09:00', endTime: '17:00', ownerId: 'owner' },
-    ],
+    data: workingHoursData,
   });
 
   console.log('✅ Created 5 WorkingHours entries (mon-fri)');
@@ -77,42 +79,12 @@ async function main() {
   console.log(`✅ Created ${eventTypes.count} Event Types`);
 
   // ============================================================================
-  // 3. Create TimeOffs (выходные и отпуска)
+  // 3. Prepare anchor dates for generated data
   // ============================================================================
   const now = new Date();
   const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
-
-  // Создаем выходные на будущие даты
-  const timeOffsData = [
-    // Отпуск через 2 недели (недельный отпуск)
-    {
-      startDateTime: new Date(tomorrow.getTime() + 14 * 24 * 60 * 60 * 1000),
-      endDateTime: new Date(tomorrow.getTime() + 21 * 24 * 60 * 60 * 1000),
-    },
-    // Выходной через 4 недели (один день)
-    {
-      startDateTime: new Date(tomorrow.getTime() + 28 * 24 * 60 * 60 * 1000),
-      endDateTime: new Date(tomorrow.getTime() + 29 * 24 * 60 * 60 * 1000),
-    },
-    // Короткий выходной через 6 недель (утро)
-    {
-      startDateTime: new Date(tomorrow.getTime() + 42 * 24 * 60 * 60 * 1000),
-      endDateTime: new Date(tomorrow.getTime() + 42 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000), // +4 часа
-    },
-  ];
-
-  for (const timeOffData of timeOffsData) {
-    await prisma.timeOff.create({
-      data: {
-        ...timeOffData,
-        ownerId: 'owner',
-      },
-    });
-  }
-
-  console.log(`✅ Created ${timeOffsData.length} Time Off entries`);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  tomorrow.setUTCHours(0, 0, 0, 0);
 
   // ============================================================================
   // 4. Create Bookings (бронирования)
@@ -229,7 +201,120 @@ async function main() {
     });
   }
 
-  console.log(`✅ Created ${bookingsData.length} Bookings (all within working hours mon-fri 09:00-17:00 UTC)\n`);
+  console.log(`✅ Created ${bookingsData.length} Bookings (all within working hours mon-fri 09:00-17:00 UTC)`);
+
+  // ============================================================================
+  // 5. Create TimeOffs between bookings (no overlaps)
+  // ============================================================================
+  const bookingsWithEnd = bookingsData
+    .map((bookingData) => {
+      const duration = eventTypeMap[bookingData.eventTypeId as keyof typeof eventTypeMap];
+      return {
+        start: bookingData.startTime,
+        end: new Date(bookingData.startTime.getTime() + duration * 60 * 1000),
+      };
+    })
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  const weekdayToWorkingWindow = new Map(workingHoursData.map((wh) => [wh.weekday, wh]));
+  const dayKeys = Array.from(new Set(bookingsWithEnd.map((b) => b.start.toISOString().slice(0, 10))));
+
+  const getWeekday = (date: Date): Prisma.WorkingHoursCreateManyInput['weekday'] => {
+    const days: Prisma.WorkingHoursCreateManyInput['weekday'][] = [
+      'sun',
+      'mon',
+      'tue',
+      'wed',
+      'thu',
+      'fri',
+      'sat',
+    ];
+    return days[date.getUTCDay()];
+  };
+
+  const atDayTimeUtc = (dateKey: string, time: string): Date => {
+    return new Date(`${dateKey}T${time}:00.000Z`);
+  };
+
+  const candidateTimeOffs: Array<{ startDateTime: Date; endDateTime: Date; ownerId: string }> = [];
+  const timeOffDurationMs = 45 * 60 * 1000;
+
+  for (const dayKey of dayKeys) {
+    if (candidateTimeOffs.length >= 3) {
+      break;
+    }
+
+    const dayDate = new Date(`${dayKey}T00:00:00.000Z`);
+    const weekday = getWeekday(dayDate);
+    const workingHours = weekdayToWorkingWindow.get(weekday);
+
+    if (!workingHours) {
+      continue;
+    }
+
+    const dayBookings = bookingsWithEnd
+      .filter((b) => b.start.toISOString().slice(0, 10) === dayKey)
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    const workStart = atDayTimeUtc(dayKey, workingHours.startTime);
+    const workEnd = atDayTimeUtc(dayKey, workingHours.endTime);
+
+    const gaps: Array<{ start: Date; end: Date }> = [];
+    let cursor = new Date(workStart);
+
+    for (const booking of dayBookings) {
+      if (booking.start > cursor) {
+        gaps.push({ start: new Date(cursor), end: new Date(booking.start) });
+      }
+
+      if (booking.end > cursor) {
+        cursor = new Date(booking.end);
+      }
+    }
+
+    if (cursor < workEnd) {
+      gaps.push({ start: new Date(cursor), end: new Date(workEnd) });
+    }
+
+    for (const gap of gaps) {
+      if (candidateTimeOffs.length >= 3) {
+        break;
+      }
+
+      if ((gap.end.getTime() - gap.start.getTime()) < timeOffDurationMs) {
+        continue;
+      }
+
+      const startDateTime = new Date(gap.start);
+      const endDateTime = new Date(startDateTime.getTime() + timeOffDurationMs);
+
+      candidateTimeOffs.push({
+        startDateTime,
+        endDateTime,
+        ownerId: 'owner',
+      });
+    }
+  }
+
+  const hasBookingOverlap = (start: Date, end: Date): boolean => {
+    return bookingsWithEnd.some((booking) => booking.start < end && booking.end > start);
+  };
+
+  for (const timeOff of candidateTimeOffs) {
+    if (hasBookingOverlap(timeOff.startDateTime, timeOff.endDateTime)) {
+      throw new Error('Invalid seed data: generated time-off overlaps with booking');
+    }
+  }
+
+  if (candidateTimeOffs.length === 0) {
+    throw new Error('Invalid seed data: could not generate time-offs from booking gaps');
+  }
+
+  await prisma.timeOff.createMany({
+    data: candidateTimeOffs,
+  });
+
+  console.log(`✅ Created ${candidateTimeOffs.length} Time Off entries (no booking overlaps)\n`);
 
   // ============================================================================
   // Summary
@@ -239,7 +324,7 @@ async function main() {
   console.log(`  👤 Owner: ${owner.name}`);
   console.log(`  � Working Hours: 5 days (mon-fri)`);
   console.log(`  �📅 Event Types: ${eventTypes.count}`);
-  console.log(`  🏖️  Time Offs: ${timeOffsData.length}`);
+  console.log(`  🏖️  Time Offs: ${candidateTimeOffs.length}`);
   console.log(`  📋 Bookings: ${bookingsData.length}`);
   console.log('\n📌 Prisma Studio: npm run db:studio (opens at http://localhost:5555)');
 }
