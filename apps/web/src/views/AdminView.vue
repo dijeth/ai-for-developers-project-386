@@ -73,14 +73,8 @@ const menuItems = ref([
   },
 ]);
 
-const toggleMenu = (event: Event) => {
-  menuRef.value?.toggle(event);
-};
-
-const handleCalendarActionsClick = (event: Event) => {
-  event.preventDefault();
-  event.stopPropagation();
-  toggleMenu(event);
+const handleCalendarActionsClick = () => {
+  handleEditProfile();
 };
 
 // Get set of dates that have bookings (only future/present, not past)
