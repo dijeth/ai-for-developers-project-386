@@ -1,11 +1,10 @@
 import { ref, computed } from 'vue';
 import type { EventType, AvailableSlot, PublicOwner, WorkingHours, Booking, CreateBookingRequest } from '../types/booking';
+import { publicApi } from '../api';
 import {
   formatTimeRange,
   addMonths
 } from '../utils/date.utils';
-
-const API_BASE_URL = '/api';
 
 export function useEventTypes() {
   const eventTypes = ref<EventType[]>([]);
@@ -16,12 +15,8 @@ export function useEventTypes() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${API_BASE_URL}/event-types`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch event types');
-      }
-      const data = await response.json();
-      eventTypes.value = data.eventTypes;
+      const data = await publicApi.listEventTypes();
+      eventTypes.value = data;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
     } finally {
@@ -46,16 +41,7 @@ export function useAvailableSlots() {
     isLoading.value = true;
     error.value = null;
     try {
-      const params = new URLSearchParams();
-      params.append('dateFrom', dateFrom);
-      params.append('dateTo', dateTo);
-      const response = await fetch(
-        `${API_BASE_URL}/event-types/${eventTypeId}/available-slots?${params.toString()}`
-      );
-      if (!response.ok) {
-        throw new Error('Failed to fetch available slots');
-      }
-      const data = await response.json();
+      const data = await publicApi.getAvailableSlots(eventTypeId, { dateFrom, dateTo });
       slots.value = data.slots;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
@@ -81,11 +67,7 @@ export function useOwner() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${API_BASE_URL}/owner`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch owner');
-      }
-      const data = await response.json();
+      const data = await publicApi.getOwner();
       owner.value = data;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
@@ -118,12 +100,8 @@ export function useWorkingHours() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${API_BASE_URL}/owner/working-hours`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch working hours');
-      }
-      const data = await response.json();
-      workingHours.value = data.workingHours;
+      const data = await publicApi.getWorkingHours();
+      workingHours.value = data;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
     } finally {
@@ -151,17 +129,7 @@ export function useCreateBooking() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${API_BASE_URL}/bookings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(request)
-      });
-      if (!response.ok) {
-        throw new Error('Failed to create booking');
-      }
-      const data = await response.json();
+      const data = await publicApi.createBooking(request);
       booking.value = data;
       return data;
     } catch (e) {
@@ -183,7 +151,7 @@ export function useCreateBooking() {
 // Re-export for backward compatibility
 export { toUTCDateString, toUTCEndOfDayString } from '../utils/date.utils';
 export { formatLongDate as formatDate } from '../utils/date.utils';
-export { addMonths, startOfLocalMonth, endOfLocalMonth } from '../utils/date.utils';
+export { addMonths } from '../utils/date.utils';
 
 /**
  * Formats an available slot as time range for display.

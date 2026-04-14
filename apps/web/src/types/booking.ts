@@ -27,7 +27,7 @@ export interface PublicOwner {
   name: string;
   description?: string;
   avatar?: string;
-  bookingMonthsAhead: number;
+  bookingMonthsAhead?: number;
   timezone: string;
 }
 

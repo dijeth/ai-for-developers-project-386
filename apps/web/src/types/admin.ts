@@ -73,37 +73,4 @@ export interface DateRangeFilter {
 }
 
 
-// ...удалены дублирующиеся интерфейсы EventType, Guest, Booking, BookingListResponse, TimeOffListResponse, BookingStats, DateRangeFilter...
 
-export interface Guest {
-  name: string;
-  email: string;
-}
-
-export interface Booking {
-  id: string;
-  eventType: EventType;
-  startTime: string;
-  endTime: string;
-  guest: Guest;
-}
-
-export interface BookingListResponse {
-  bookings: Booking[];
-}
-
-export interface TimeOffListResponse {
-  timeOffs: WorkingHoursTimeOff[];
-}
-
-export interface BookingStats {
-  today: number;
-  thisWeek: number;
-  thisMonth: number;
-  totalDurationToday: number; // in minutes
-}
-
-export interface DateRangeFilter {
-  dateFrom: string;
-  dateTo: string;
-}

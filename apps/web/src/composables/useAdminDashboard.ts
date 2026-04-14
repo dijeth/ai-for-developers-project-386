@@ -8,11 +8,8 @@ import {
   endOfLocalWeek,
   startOfLocalMonth,
   endOfLocalMonth,
-  getLocalDayOfWeek,
   addMonths
 } from '../utils/date.utils';
-
-const ADMIN_API_BASE_URL = '/api/admin';
 
 export function useAdminBookings() {
   const bookings = ref<Booking[]>([]);
@@ -66,11 +63,7 @@ export function useAdminOwner() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/owner`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch owner: ${response.status}`);
-      }
-      const data = await response.json();
+      const data = await adminApi.getOwner();
       owner.value = data;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
@@ -89,15 +82,7 @@ export function useAdminOwner() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/owner`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
-      if (!response.ok) {
-        throw new Error('Failed to update owner');
-      }
-      const data = await response.json();
+      const data = await adminApi.updateOwner(updates);
       owner.value = data;
       return data;
     } catch (e) {
@@ -123,34 +108,12 @@ export function useAdminTimeOffs() {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
-  const getApiErrorMessage = async (
-    response: Response,
-    fallback: string
-  ): Promise<string> => {
-    try {
-      const data = await response.json();
-      if (typeof data?.message === 'string') {
-        return data.message;
-      }
-      if (Array.isArray(data?.message)) {
-        return data.message.join(', ');
-      }
-      return fallback;
-    } catch {
-      return fallback;
-    }
-  };
-
   const fetchTimeOffs = async () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/time-offs`);
-      if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, 'Failed to fetch time-offs'));
-      }
-      const data = await response.json();
-      timeOffs.value = Array.isArray(data) ? data : data.timeOffs;
+      const data = await adminApi.listTimeOffs();
+      timeOffs.value = data;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
       throw e;
@@ -166,17 +129,7 @@ export function useAdminTimeOffs() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/time-offs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, 'Failed to create time-off'));
-      }
-
-      const data = await response.json();
+      const data = await adminApi.createTimeOff(payload);
       timeOffs.value = [...timeOffs.value, data];
       return data;
     } catch (e) {
@@ -197,17 +150,7 @@ export function useAdminTimeOffs() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/time-offs/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, 'Failed to update time-off'));
-      }
-
-      const data = await response.json();
+      const data = await adminApi.updateTimeOff(id, payload);
       timeOffs.value = timeOffs.value.map((item) =>
         item.id === id ? data : item
       );
@@ -224,14 +167,7 @@ export function useAdminTimeOffs() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/time-offs/${id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, 'Failed to delete time-off'));
-      }
-
+      await adminApi.deleteTimeOff(id);
       timeOffs.value = timeOffs.value.filter((item) => item.id !== id);
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
@@ -257,34 +193,12 @@ export function useAdminEventTypes() {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
-  const getApiErrorMessage = async (
-    response: Response,
-    fallback: string
-  ): Promise<string> => {
-    try {
-      const data = await response.json();
-      if (typeof data?.message === 'string') {
-        return data.message;
-      }
-      if (Array.isArray(data?.message)) {
-        return data.message.join(', ');
-      }
-      return fallback;
-    } catch {
-      return fallback;
-    }
-  };
-
   const fetchEventTypes = async () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/event-types`);
-      if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, 'Failed to fetch event types'));
-      }
-      const data = await response.json();
-      eventTypes.value = Array.isArray(data) ? data : data.eventTypes;
+      const data = await adminApi.listEventTypes();
+      eventTypes.value = data;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
       throw e;
@@ -301,20 +215,9 @@ export function useAdminEventTypes() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/event-types`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, 'Failed to create event type'));
-      }
-
-      const data = await response.json();
-      const created = data?.eventType ?? data;
-      eventTypes.value = [...eventTypes.value, created];
-      return created;
+      const data = await adminApi.createEventType(payload);
+      eventTypes.value = [...eventTypes.value, data];
+      return data;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
       throw e;
@@ -334,22 +237,11 @@ export function useAdminEventTypes() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/event-types/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, 'Failed to update event type'));
-      }
-
-      const data = await response.json();
-      const updated = data?.eventType ?? data;
+      const data = await adminApi.updateEventType(id, payload);
       eventTypes.value = eventTypes.value.map((item) =>
-        item.id === id ? updated : item
+        item.id === id ? data : item
       );
-      return updated;
+      return data;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
       throw e;
@@ -362,14 +254,7 @@ export function useAdminEventTypes() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/event-types/${id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, 'Failed to delete event type'));
-      }
-
+      await adminApi.deleteEventType(id);
       eventTypes.value = eventTypes.value.filter((item) => item.id !== id);
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
@@ -399,12 +284,8 @@ export function useAdminWorkingHours() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/working-hours`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch working hours: ${response.status}`);
-      }
-      const data = await response.json();
-      workingHours.value = data.workingHours;
+      const data = await adminApi.getWorkingHours();
+      workingHours.value = data;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
     } finally {
@@ -417,19 +298,11 @@ export function useAdminWorkingHours() {
   const updateWorkingHours = async (weekday: string, updates: { startTime?: string; endTime?: string }) => {
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/working-hours/${weekday}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to update working hours for ${weekday}`);
-      }
-      const data = await response.json();
+      const data = await adminApi.updateWorkingHours(weekday, updates);
       // Update local state
       const index = workingHours.value.findIndex((wh) => wh.weekday === weekday);
       if (index >= 0) {
-        workingHours.value[index] = data.workingHours;
+        workingHours.value[index] = data;
       }
       return data;
     } catch (e) {
@@ -441,16 +314,8 @@ export function useAdminWorkingHours() {
   const replaceWorkingHours = async (entries: { weekday: string; startTime: string; endTime: string }[]) => {
     error.value = null;
     try {
-      const response = await fetch(`${ADMIN_API_BASE_URL}/owner/working-hours`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workingHours: entries })
-      });
-      if (!response.ok) {
-        throw new Error('Failed to save working hours');
-      }
-      const data = await response.json();
-      workingHours.value = data.workingHours;
+      const data = await adminApi.replaceWorkingHours(entries);
+      workingHours.value = data;
       return data;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Unknown error';
@@ -520,17 +385,6 @@ export {
   toUTCEndOfDayString,
   formatLocalDate as formatDateLocal,
   formatLocalTime as formatTimeLocal,
-  formatLocalDateTime as formatDateTimeLocal,
   fromISO,
-  isSameLocalDay as isSameDay,
-  getLocalDayOfWeek
+  isSameLocalDay as isSameDay
 } from '../utils/date.utils';
-
-/**
- * Gets day of week string from a date.
- */
-export function getDayOfWeek(date: Date): 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun' {
-  const days: ('sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat')[] =
-    ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-  return days[getLocalDayOfWeek(date)] as 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
-}
