@@ -32,7 +32,8 @@ export const adminApi = {
 
   // Event Types
   async listEventTypes(): Promise<EventType[]> {
-    return adminClient.get<EventType[]>('/event-types')
+    const response = await adminClient.get<{ eventTypes: EventType[] }>('/event-types')
+    return response.eventTypes
   },
 
   async createEventType(request: CreateEventTypeRequest): Promise<EventType> {
