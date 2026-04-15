@@ -3,160 +3,173 @@
 ## Quick Reference
 
 ```bash
-# Local development
-npm run docker:up          # Build and start
-docker-compose down        # Stop
-npm run docker:clean       # Stop and remove volumes
+# Development (Docker Compose with profiles)
+npm run dev              # Start dev environment
+npm run dev:down         # Stop dev environment
 
-# Railway deployment
-railway login              # Login to CLI
-railway link               # Link project
-railway up                 # Deploy
+# E2E Testing
+npm run e2e              # Start E2E services and run tests
+npm run e2e:ui           # Interactive UI mode
+npm run e2e:down         # Stop E2E services
 
-# Hugging Face Spaces deployment
-# Auto-deploys on push to main via GitHub Actions
-# Or manual deploy with HF CLI:
-huggingface-cli login      # Login to Hugging Face
-huggingface-cli repo create my-space --type space --sdk docker
+# Production / Hugging Face
+npm run start            # Production container on port 7860
+npm run start:down       # Stop production container
+
+# Cleanup
+npm run docker:clean     # Stop all containers and remove volumes (clears DB!)
 ```
 
-## Local Development
+## Docker Compose Profiles
+
+All environments use unified `docker-compose.yml` with profiles:
+
+| Profile | Services | Usage |
+|---------|----------|-------|
+| `dev` | spec-watcher, type-watcher, api-dev, prism, web-dev | Local development |
+| `e2e` | api-e2e, web-builder-e2e, web-e2e | E2E testing |
+| `prod` | app | Production / Hugging Face |
+
+## Development Profile
 
 ### Prerequisites
-- Docker & Docker Compose
+- Docker (with Docker Compose plugin)
 
 ### Commands
 
 ```bash
-# Build and start all services
-docker-compose up --build
+# Start development environment
+npm run dev
+# Or explicitly:
+docker compose --profile dev up --build
 
-# Or use npm script
-npm run docker:up
-
-# Access the app
-open http://localhost:3000
-```
-
-### Useful Commands
-
-```bash
-# Stop containers
-docker-compose down
+# Stop
+docker compose --profile dev down
 
 # View logs
-docker-compose logs -f app
-
-# Rebuild after code changes
-docker-compose up --build
-
-# Clean up everything including database (WARNING: data loss!)
-npm run docker:clean
-
-# Shell into container
-docker-compose exec app sh
-
-# Check database
-docker-compose exec app ls -la /app/api/data/
+docker compose logs -f api-dev
+docker compose logs -f web-dev
+docker compose logs -f prism
 ```
 
-## Railway Deployment
+### Development Architecture
 
-### Option 1: GitHub Integration (Recommended)
+```
+┌─────────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
+│  spec-      │ → │ type-   │   │  api-   │   │  web-   │
+│  watcher    │   │ watcher │   │  dev    │ ← │  dev    │
+│ (:4010 tsp) │   │(types)  │   │ (:3001) │   │ (:3000) │
+└─────────────┘   └─────────┘   └────▲────┘   └────┬────┘
+                                     │              │
+                                     └──────────────┘
+                                           │
+                                    ┌─────────────┐
+                                    │   Prism     │
+                                    │   (:4010)   │
+                                    └─────────────┘
+```
 
-1. Push code to GitHub repository
-2. Go to [Railway dashboard](https://railway.app)
-3. Click "New Project" → "Deploy from GitHub repo"
-4. Select your repository
-5. Railway auto-detects `Dockerfile` and `railway.toml`
-6. Every push to `main` triggers auto-deployment
+**Services:**
+- `spec-watcher`: TypeSpec watch mode (compiles `.tsp` → `openapi.yaml`)
+- `type-watcher`: Auto-regenerates TypeScript types from `openapi.yaml`
+- `api-dev`: NestJS dev server (:3001) with auto-migrations and seeding
+- `prism`: OpenAPI validation proxy (:4010)
+- `web-dev`: Vite dev server (:3000) with HMR
 
-### Option 2: Railway CLI
+## E2E Testing Profile
+
+### Commands
 
 ```bash
-# Install CLI
-npm install -g @railway/cli
+# Run tests (starts services automatically)
+npm run e2e
 
-# Login (opens browser)
-railway login
+# Interactive UI mode
+npm run e2e:ui
 
-# Link to project
-railway link
-
-# Deploy current directory
-railway up
-
-# View logs
-railway logs
-
-# Open deployed app
-railway open
+# Stop E2E services
+npm run e2e:down
 ```
 
-### Configuration
-
-Railway settings are in `railway.toml`:
-
-```toml
-[deploy]
-healthcheckPath = "/api/owner"    # Health check endpoint
-healthcheckPort = 80              # Nginx port
-restartPolicyType = "on_failure"
-```
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NODE_ENV` | `production` | Runtime environment |
-| `PORT` | `3001` | Internal API port (inside container) |
-| `DATABASE_URL` | `file:./data/prod.db` | SQLite database path |
-
-Override in Railway dashboard if needed.
-
-### Persistent Storage (Important!)
-
-SQLite database must persist across deploys:
-
-1. Go to Railway Dashboard → Your Service → Settings
-2. Add Volume:
-   - Mount Path: `/app/api/data`
-   - Size: 1GB (or as needed)
-3. Redeploy
-
-Without this volume, database resets on every deployment!
-
-## Architecture
+### Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│              Nginx (Port 80)                        │
-│  ┌─────────────────┐    ┌──────────────────────────┐  │
-│  │ Static Files    │    │ API Proxy                │  │
-│  │ (Vue.js build)  │    │ /api/* → localhost:3001 │  │
-│  │                 │    │                          │  │
-│  │ • index.html    │    │ Health: /api/owner       │  │
-│  │ • assets/       │    │                          │  │
-│  │ • themes/       │    │                          │  │
-│  └─────────────────┘    └──────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│           NestJS API (Port 3001)                    │
-│                                                      │
-│  • Prisma ORM (SQLite)                              │
-│  • TypeSpec-generated API contracts                 │
-│  • Database: /app/api/data/prod.db                 │
-│                                                      │
-└─────────────────────────────────────────────────────┘
+┌─────────────┐      ┌─────────────┐
+│  web-e2e    │─────▶│   api-e2e   │
+│  (nginx)    │      │   (:3001)   │
+│  (:3000)    │      │   SQLite    │
+└─────────────┘      └─────────────┘
 ```
+
+**Services:**
+- `api-e2e`: Production build of API on port 3001
+- `web-builder-e2e`: Builds frontend for testing
+- `web-e2e`: Nginx serving built frontend on port 3000
+
+### Fast Debug Mode
+
+For debugging without full Docker rebuild:
+
+```bash
+# 1. Build locally first
+npm run build -w api
+npm run build -w web
+
+# 2. Start with override (mounts local builds)
+docker compose -f docker-compose.yml -f docker-compose.override.yml --profile e2e up -d
+
+# 3. Run tests
+cd apps/e2e && npx playwright test
+```
+
+## Production Profile (Hugging Face)
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│              Nginx (Port 7860)              │
+│  ┌──────────────┐      ┌──────────────────┐ │
+│  │ Static files │      │ Proxy /api/*     │ │
+│  │ (Vue build)  │──────│ → Node.js:3001   │ │
+│  └──────────────┘      └──────────────────┘ │
+└─────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────┐
+│           NestJS API (Port 3001)            │
+│                                              │
+│  • Prisma ORM + SQLite                      │
+│  • Database: /data/prod.db                 │
+└─────────────────────────────────────────────┘
+```
+
+### Deployment
+
+**Hugging Face Spaces** (recommended):
+- Auto-deploys on push to `main` via GitHub Actions
+- See `.github/workflows/huggingface-deploy.yml`
+
+**Manual deploy:**
+```bash
+pip install huggingface-hub
+huggingface-cli login
+git remote add hf https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME
+git push hf main
+```
+
+### Important Notes
+
+- **Port**: 7860 (Hugging Face Spaces standard)
+- **Persistent Storage**: Enable in Space Settings, uses `/data`
+- **Health Check**: `GET /api/owner` on port 7860
+- **SQLite**: Database at `/data/prod.db`
 
 ## Build Process (Multi-stage)
 
 ```
 Stage 1: deps
-  └── Install npm dependencies
+  └── Install npm dependencies (used for development)
 
 Stage 2: spec-builder
   └── Generate OpenAPI from TypeSpec
@@ -177,13 +190,14 @@ Stage 4: production
 
 ```
 docker/
-├── nginx.conf          # Nginx configuration
-└── start.sh            # Container startup script
+├── nginx.conf          # Production nginx configuration
+├── nginx-e2e.conf      # E2E nginx configuration
+└── start.sh            # Production container startup script
 
 Dockerfile              # Multi-stage build
-.dockerignore           # Files excluded from build
+docker-compose.yml      # Unified compose with profiles
+docker-compose.override.yml  # Optional override for E2E debug
 docker-compose.yml      # Local development
-railway.toml            # Railway deployment config
 DOCKER.md               # This file
 ```
 
@@ -193,35 +207,35 @@ DOCKER.md               # This file
 
 ```bash
 # Check logs
-docker-compose logs -f app
+docker compose logs -f <service-name>
 
-# Test locally with shell
-docker run -it --rm calendar-booking sh
+# Check all services
+docker compose ps
 ```
 
 ### Database permission errors
 
 ```bash
 # Check permissions inside container
-docker-compose exec app ls -la /app/api/data/
+docker compose exec api-e2e ls -la /data/
 
 # Should show: drwxrwxrwx (777)
 ```
 
-### Health check failures (Railway)
+### Health check failures
 
 Common causes:
 1. Database not migrated → Check startup logs
-2. Port misconfiguration → Verify `EXPOSE 80` in Dockerfile
-3. Backend crash → Check `railway logs`
+2. Port misconfiguration → Verify service ports
+3. Backend crash → Check service logs
 
 ### Rebuild everything
 
 ```bash
 # Nuclear option: remove all and rebuild
-docker-compose down -v
+docker compose down -v
 docker system prune -a
-docker-compose up --build
+docker compose --profile <profile> up --build
 ```
 
 ## Security Notes
@@ -231,65 +245,8 @@ docker-compose up --build
 - No authentication in MVP (as per requirements)
 - Health endpoint is public (`GET /api/owner`)
 
-## Hugging Face Spaces Deployment
-
-### Setup (One-time)
-
-1. **Create Hugging Face Account**: https://huggingface.co/join
-
-2. **Create Space**:
-   - Go to https://huggingface.co/spaces
-   - Click "Create new Space"
-   - Name: `calendar-booking` (or your choice)
-   - SDK: **Docker**
-   - Hardware: **Free** (or upgrade as needed)
-   - Visibility: **Public** or **Private**
-
-3. **Configure GitHub Secrets** (for auto-deploy):
-   - Go to your GitHub repo → Settings → Secrets and variables → Actions
-   - Add `HF_TOKEN`: Your Hugging Face access token (get from https://huggingface.co/settings/tokens)
-   - Add `HF_SPACE_NAME`: Your space name (e.g., `username/calendar-booking`)
-
-4. **Enable Persistent Storage** (important!):
-   - Go to Space Settings → "Enable persistent storage"
-   - This ensures SQLite database persists across restarts
-
-### Deployment
-
-**Option 1: GitHub Actions (Auto-deploy)** ⭐ Recommended
-- Push to `main` branch → automatic deployment to Hugging Face Spaces
-- Configured in `.github/workflows/huggingface-deploy.yml`
-
-**Option 2: Manual CLI**
-```bash
-# Install Hugging Face CLI
-pip install huggingface-hub
-
-# Login
-huggingface-cli login
-
-# Add remote and push
-git remote add hf https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME
-git push hf main
-```
-
-### Architecture Differences (vs Railway)
-
-| Feature | Railway | Hugging Face Spaces |
-|---------|---------|---------------------|
-| Default Port | 80 | 7860 |
-| Persistent Storage | `/app/api/data` | `/data` (symlinked) |
-| Health Check | `/api/owner` on :80 | Built-in on :7860 |
-| Auto-deploy | Railway CLI / GitHub | GitHub Actions |
-| Config File | `railway.toml` | `README.md` metadata |
-
-### URLs
-
-- **Railway**: `https://your-app.up.railway.app`
-- **Hugging Face**: `https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME`
-
 ## CI/CD (GitHub Actions)
 
 - **Hexlet Check**: `.github/workflows/hexlet-check.yml` (auto-generated, runs on every push)
-- **Docker Build Test**: `.github/workflows/docker.yml` (tests Docker build on PRs)
+- **E2E Tests**: `.github/workflows/e2e.yml` (runs E2E tests with browser caching)
 - **Hugging Face Deploy**: `.github/workflows/huggingface-deploy.yml` (deploys to HF Spaces on push to main)

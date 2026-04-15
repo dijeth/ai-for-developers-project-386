@@ -1,11 +1,11 @@
 # Multi-stage build for Calendar Booking MVP
-# Stage 1: Dependencies
+# Stage 1: Dependencies (used as base for development services via docker compose)
 FROM node:20-alpine AS deps
 
 WORKDIR /app
 
-# Copy all package.json files for workspace resolution
-COPY package*.json turbo.json ./
+# Copy root package.json for workspace resolution
+COPY package*.json ./
 COPY apps/api/package*.json ./apps/api/
 COPY apps/web/package*.json ./apps/web/
 COPY packages/api-spec/package*.json ./packages/api-spec/
@@ -44,7 +44,6 @@ COPY apps/api ./apps/api
 COPY apps/web ./apps/web
 COPY packages/date-utils ./packages/date-utils
 COPY packages/contracts ./packages/contracts
-COPY turbo.json ./
 
 # Install tsx for seed script
 RUN npm install -g tsx
@@ -67,8 +66,11 @@ RUN npm run build
 # Stage 4: Production image
 FROM nginx:alpine AS production
 
-# Install Node.js for backend in production image
-RUN apk add --no-cache nodejs npm
+# Install Node.js and timezone data for consistent date handling
+RUN apk add --no-cache nodejs npm tzdata
+
+# Set timezone to UTC for consistent date parsing across environments
+ENV TZ=UTC
 
 WORKDIR /app
 

@@ -1,0 +1,66 @@
+# Docker Compose override for fast E2E test debugging
+# 
+# Usage (debug without full rebuild):
+#   1. Build the code locally first:
+#      npm run build -w api
+#      npm run build -w web
+#   2. Start E2E services with override:
+#      docker compose -f docker-compose.yml -f docker-compose.override.yml --profile e2e up -d
+#
+# This mounts pre-built code from host, allowing:
+# - Changes without docker rebuild
+# - Fast iteration when debugging tests
+# - Access to API logs for debugging
+
+version: '3.8'
+
+services:
+  api-e2e:
+    # Mount built code for hot-reload-like behavior
+    # Note: Must rebuild host code after changes: npm run build -w api
+    volumes:
+      - ./apps/api/dist:/app/apps/api/dist:ro
+      - ./apps/api/prisma:/app/apps/api/prisma:ro
+      - api_logs:/app/logs
+    
+    environment:
+      # Enable debug logging to see 400 error details
+      - LOG_LEVEL=debug
+      - DEBUG=true
+      - TZ=UTC
+    
+    # Override command to enable more verbose output
+    command: >
+      sh -c "
+        mkdir -p /data /app/logs &&
+        npx prisma db push --accept-data-loss 2>&1 | tee /app/logs/prisma.log &&
+        npm run db:seed 2>&1 | tee /app/logs/seed.log &&
+        echo 'Starting API with debug logging...' &&
+        NODE_ENV=production node dist/src/main 2>&1 | tee /app/logs/api.log
+      "
+
+  web-e2e:
+    # Override volumes to use host-built files (bypass web-builder)
+    volumes:
+      # E2E nginx config
+      - ./docker/nginx-e2e.conf:/etc/nginx/conf.d/default.conf:ro
+      # Mount built frontend directly (bypass web-builder)
+      - ./apps/web/dist:/usr/share/nginx/html:ro
+      - ./apps/web/public/themes:/usr/share/nginx/html/themes:ro
+    
+    environment:
+      - TZ=UTC
+    
+    # Override depends_on - no need to wait for web-builder
+    depends_on:
+      api-e2e:
+        condition: service_healthy
+
+  # Disable web-builder in override mode (we use host-built files)
+  web-builder-e2e:
+    deploy:
+      replicas: 0
+
+volumes:
+  api_logs:
+    driver: local

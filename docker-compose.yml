@@ -1,21 +1,186 @@
-version: '3.8'
+# Unified Docker Compose configuration for all environments
+# Usage:
+#   docker compose --profile dev up      # Local development
+#   docker compose --profile e2e up      # E2E testing
+#   docker compose --profile prod up     # Production (Hugging Face)
+#
+# For fast E2E debug without rebuild:
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml --profile e2e up
+
+version: "3.8"
+
+x-api-base: &api-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: deps
+  volumes:
+    - .:/app:cached
+    - node_modules:/app/node_modules
+  environment:
+    - NODE_ENV=development
+    - PORT=3001
+    - TZ=UTC
 
 services:
+  # ==========================================
+  # DEVELOPMENT PROFILE
+  # ==========================================
+
+  spec-watcher:
+    <<: *api-base
+    profiles: ["dev"]
+    working_dir: /app/packages/api-spec
+    command: npm run dev
+    container_name: calendar-spec-watcher
+    healthcheck:
+      disable: true
+
+  type-watcher:
+    <<: *api-base
+    profiles: ["dev"]
+    working_dir: /app/apps/web
+    command: npm run watch:types
+    container_name: calendar-type-watcher
+    depends_on:
+      spec-watcher:
+        condition: service_started
+    healthcheck:
+      disable: true
+
+  api-dev:
+    <<: *api-base
+    profiles: ["dev"]
+    ports:
+      - "3001:3001"
+    environment:
+      - DATABASE_URL=file:/data/dev.db
+    working_dir: /app/apps/api
+    command: >
+      sh -c "
+        npx prisma db push --accept-data-loss &&
+        npm run db:seed &&
+        npm run dev
+      "
+    container_name: calendar-api-dev
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3001/api/owner"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  prism:
+    image: stoplight/prism:5
+    profiles: ["dev"]
+    ports:
+      - "4010:4010"
+    volumes:
+      - ./packages/contracts/openapi.yaml:/openapi.yaml:ro
+    # -m false disables multiprocess mode to avoid Node.js 20 compatibility issues
+    # -h 0.0.0.0 allows connections from outside the container (Docker port forwarding)
+    command: proxy /openapi.yaml http://api-dev:3001 --errors -p 4010 -m false -h 0.0.0.0
+    container_name: calendar-prism
+    depends_on:
+      api-dev:
+        condition: service_healthy
+
+  web-dev:
+    <<: *api-base
+    profiles: ["dev"]
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_TARGET=http://prism:4010
+    working_dir: /app/apps/web
+    # --host makes Vite listen on 0.0.0.0 to accept Docker port forwarding
+    command: npm run dev -- --host
+    container_name: calendar-web-dev
+    depends_on:
+      - prism
+      - type-watcher
+
+  # ==========================================
+  # E2E TESTING PROFILE
+  # ==========================================
+
+  api-e2e:
+    <<: *api-base
+    profiles: ["e2e"]
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/data/test.db
+    working_dir: /app/apps/api
+    command: >
+      sh -c "
+        npx prisma db push --accept-data-loss &&
+        npm run db:seed &&
+        node dist/src/main
+      "
+    container_name: calendar-api-e2e
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3001/api/owner"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  web-builder-e2e:
+    <<: *api-base
+    profiles: ["e2e"]
+    volumes:
+      - web_dist:/app/apps/web/dist
+    working_dir: /app/apps/web
+    command: >
+      sh -c "
+        npm run copy-themes &&
+        npm run build
+      "
+    container_name: calendar-web-builder-e2e
+
+  web-e2e:
+    image: nginx:alpine
+    profiles: ["e2e"]
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./docker/nginx-e2e.conf:/etc/nginx/conf.d/default.conf:ro
+      - web_dist:/usr/share/nginx/html:ro
+    container_name: calendar-web-e2e
+    depends_on:
+      api-e2e:
+        condition: service_healthy
+      web-builder-e2e:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3000/"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  # ==========================================
+  # PRODUCTION PROFILE (Hugging Face)
+  # ==========================================
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
       target: production
+    profiles: ["prod"]
     ports:
       - "7860:7860"
     volumes:
-      # Persist SQLite database in /data (Hugging Face Spaces compatible)
       - sqlite_data:/data
     environment:
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_URL=file:/data/prod.db
-    restart: unless-stopped
+      - TZ=UTC
+    container_name: calendar-app
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:7860/api/owner"]
       interval: 30s
@@ -24,5 +189,6 @@ services:
       start_period: 40s
 
 volumes:
+  node_modules:
+  web_dist:
   sqlite_data:
-    driver: local

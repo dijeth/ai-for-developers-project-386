@@ -40,13 +40,32 @@ cd /app/apps/api
 node dist/src/main &
 API_PID=$!
 
-# Wait a moment for backend to initialize
-echo "Waiting for backend to start..."
-sleep 3
+# Wait for backend to be ready (polling healthcheck)
+echo "Waiting for backend to be ready..."
+MAX_RETRIES=60
+RETRY_COUNT=0
 
-# Check if backend is running
-if ! kill -0 $API_PID 2>/dev/null; then
-    echo "ERROR: Backend failed to start"
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    # Check if backend process is still running
+    if ! kill -0 $API_PID 2>/dev/null; then
+        echo "ERROR: Backend process died"
+        exit 1
+    fi
+    
+    # Try to connect to health endpoint
+    if wget -q -O - http://127.0.0.1:3001/api/owner > /dev/null 2>&1; then
+        echo "Backend is ready! (responded with HTTP 200)"
+        break
+    fi
+    
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    echo "Attempt $RETRY_COUNT/$MAX_RETRIES: Backend not ready yet, waiting..."
+    sleep 1
+done
+
+if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+    echo "ERROR: Backend failed to become ready within $MAX_RETRIES seconds"
+    kill $API_PID 2>/dev/null || true
     exit 1
 fi
 

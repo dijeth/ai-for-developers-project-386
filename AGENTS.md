@@ -10,6 +10,7 @@ Calendar booking monorepo using **TypeSpec** for API-first design. Architecture:
 apps/
   api/           # NestJS + Prisma backend (port 3001) - scaffold only, not used by frontend
   web/           # Vue 3 + PrimeVue frontend (port 3000) → proxies /api to :4010
+  e2e/           # Playwright E2E tests (port 3000 via Playwright)
 packages/
   api-spec/      # TypeSpec source files (main.tsp)
   contracts/     # Generated openapi.yaml + Prism proxy on port 4010 (forwards to :3001)
@@ -21,18 +22,29 @@ packages/
 # Install (workspaces handled automatically)
 npm install
 
-# Start all dev servers (turbo parallel)
+# Development (Docker Compose with all services)
 npm run dev
-# - api-spec watch mode: recompiles .tsp → openapi.yaml
-# - Prism proxy on port 4010 (forwards to NestJS on :3001)
-# - Vite dev server on port 3000
-# - Type generation watch mode: auto-updates TypeScript types from openapi.yaml changes
+# - TypeSpec watcher: .tsp → openapi.yaml
+# - TypeScript types watcher: openapi.yaml → generated types
+# - API server (:3001) with auto-migrations and seeding
+# - Prism proxy (:4010) for OpenAPI validation
+# - Vite dev server (:3000) with HMR
+
+# E2E Testing
+npm run e2e      # Start E2E services and run tests
+npm run e2e:ui   # Interactive UI mode
+
+# Production (Hugging Face deployment)
+npm run start    # Production container on port 7860
 
 # Build for production (tsp:compile → build pipeline)
 npm run build
 
 # Type-check all packages
 npm run typecheck
+
+# Cleanup
+npm run docker:clean  # Stop all containers and remove volumes
 ```
 
 ## Build Pipeline (Turbo)
@@ -63,13 +75,23 @@ Order matters:
 
 - **Framework**: Vue 3 (Composition API, `<script setup>`)
 - **UI**: PrimeVue with Lara Light Blue theme (copied to `public/themes/` via `postinstall`)
-- **Proxy**: `/api` → `http://localhost:4010` (vite.config.ts)
+- **Proxy**: `/api` → `http://localhost:4010` (Prism proxy, vite.config.ts)
 - **Commands**:
   - `npm run dev` - Vite dev server with HMR on port 3000
   - `npm run build` - `vue-tsc && vite build`
   - `npm run copy-themes` - copies PrimeVue themes to public/
   - `npm run generate:types` - regenerate TypeScript types from OpenAPI spec
   - `npm run watch:types` - auto-regenerate types when `openapi.yaml` changes (run in parallel with `npm run dev`)
+
+**API Target Configuration:**
+The Vite dev server proxy target can be configured via `VITE_API_TARGET` environment variable:
+- Default: `http://localhost:4010` (Prism proxy for dev with OpenAPI validation)
+- For E2E: `http://localhost:3001` (direct to backend)
+
+```typescript
+// vite.config.ts - uses VITE_API_TARGET env var
+const API_TARGET = process.env.VITE_API_TARGET || 'http://localhost:4010'
+```
 
 #### API Client Architecture
 
@@ -115,13 +137,14 @@ await adminApi.deleteBooking(id)
 
 ## Constraints & Gotchas
 
-1. **No linting configured** — turbo has `lint` task but packages don't implement it
+1. **No linting configured** — lint task exists but packages don't implement it
 2. **Prism runs in proxy mode** — frontend → Vite proxy (3000) → Prism (4010) → NestJS backend (3001). Prism validates requests/responses against OpenAPI spec and simulates errors.
 3. **TypeScript strictness**:
    - `apps/api`: `strict: true`, target ES2021
    - `apps/web`: `strict: true`, `noUnusedLocals: true`, target ES2020
 4. **npm@10.0.0** — pinned package manager version
 5. **Theme files** — PrimeVue themes copied on `npm install` via `postinstall` hook; if themes missing, run `npm run copy-themes`
+6. **Docker required** — All development happens inside Docker containers via `docker compose` profiles
 
 ## CI / Testing
 
@@ -129,11 +152,104 @@ await adminApi.deleteBooking(id)
 - **Do not modify** hexlet-check.yml (marked as auto-generated)
 - Tests run externally by Hexlet platform
 
+## E2E Testing (Playwright)
+
+**Location**: `apps/e2e/`
+
+### Quick Commands
+
+```bash
+# Run tests (starts E2E services automatically)
+npm run e2e
+
+# Interactive UI mode
+npm run e2e:ui
+
+# Stop E2E services
+npm run e2e:down
+```
+
+### Architecture
+
+E2E tests use Docker compose profile `e2e` which starts:
+- API server (`api-e2e`) on port 3001 with production build
+- Nginx (`web-e2e`) on port 3000 serving built frontend
+- Test database (isolated SQLite)
+
+**Test execution flow:**
+```
+Playwright → Chromium → http://localhost:3000 → Nginx → /api → NestJS (:3001)
+```
+
+Note: E2E tests proxy directly to backend (no Prism) to match production behavior. Prism is only used in development for OpenAPI validation.
+
+**Files:**
+- `apps/e2e/tests/` - Test specs
+  - `smoke.spec.ts` - Infrastructure and connectivity tests
+  - `booking.spec.ts` - User booking flow tests
+  - `admin.spec.ts` - Admin dashboard tests
+- `apps/e2e/fixtures/` - Test helpers
+  - `db.ts` - Database reset/seed helpers
+  - `test-data.ts` - Test data generators
+- `apps/e2e/playwright.config.ts` - Playwright configuration
+
+### Fast Debug Mode
+
+For debugging without full Docker rebuild:
+
+```bash
+# 1. Build locally first
+npm run build -w api
+npm run build -w web
+
+# 2. Start with override (mounts local builds)
+docker compose -f docker-compose.yml -f docker-compose.override.yml --profile e2e up -d
+
+# 3. Run tests
+cd apps/e2e && npx playwright test
+```
+
+### Writing Tests
+
+**Basic smoke test example:**
+```typescript
+import { test, expect } from '@playwright/test'
+import { setupTestDatabase } from '../fixtures/db.js'
+
+test.describe('My Feature', () => {
+  // Reset DB once per test file
+  test.beforeAll(async () => {
+    await setupTestDatabase()
+  })
+
+  test('user can view booking page', async ({ page }) => {
+    await page.goto('/booking')
+    await expect(page.locator('body')).toBeVisible()
+  })
+})
+```
+
+**Test patterns:**
+- Use `test.beforeAll` for per-file data seeding (faster than per-test)
+- Use unique identifiers (timestamps/random) to avoid data conflicts
+- Single worker (`workers: 1`) for SQLite safety
+- Screenshots and videos captured on failure
+- API helpers in `fixtures/db.ts` for creating test data via HTTP
+
+### Configuration
+
+- **Browser**: Chromium only (for speed)
+- **Workers**: 1 (SQLite concurrency safety)
+- **Parallel**: Disabled (`fullyParallel: false`)
+- **WebServer**: Managed externally via Docker Compose (see `playwright.config.ts`)
+
 ## When Adding Features
 
-1. **API changes**: Edit `packages/api-spec/main.tsp` → auto-recompiles → mocks update
-2. **Frontend changes**: Edit `apps/web/src/**/*.vue` → hot reload via Vite
-3. **Backend changes**: Edit `apps/api/src/` → NestJS on port 3001 (frontend accesses via Prism proxy on :4010)
+1. **API changes**: Edit `packages/api-spec/main.tsp` → TypeSpec watcher recompiles → openapi.yaml updates
+2. **Frontend changes**: Edit `apps/web/src/**/*.vue` → hot reload via Vite (inside Docker container)
+3. **Backend changes**: Edit `apps/api/src/` → NestJS dev server auto-restarts (inside Docker container)
+
+All development happens inside Docker containers. Code is mounted from host, so changes are immediately reflected.
 
 ## Date/Time Handling (UTC-Only Policy)
 
@@ -239,42 +355,67 @@ Monolithic container for MVP (Nginx + Node.js + SQLite). See `DOCKER.md` for ful
 ### Quick Commands
 
 ```bash
-# Local development
-npm run docker:up      # Build and start on http://localhost:3000
-npm run docker:down    # Stop containers
-npm run docker:clean   # Stop and remove volumes (clears DB!)
+# Development (Docker Compose with profiles)
+npm run dev          # Start dev environment
+npm run dev:down     # Stop dev environment
 
-# Railway deployment
-railway login
-railway link
-railway up
+# E2E Testing
+npm run e2e          # Start E2E services and run tests
+npm run e2e:down     # Stop E2E services
+
+# Production / Hugging Face
+npm run start        # Start production container
+npm run start:down   # Stop production container
+
+# Cleanup
+npm run docker:clean # Stop all containers and remove volumes (clears DB!)
 ```
 
 ### Architecture
 
+All environments use unified `docker-compose.yml` with profiles:
+
+**Development Profile (`--profile dev`):**
+```
+┌─────────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
+│  spec-      │ → │ type-   │   │  api-   │   │  web-   │
+│  watcher    │   │ watcher │   │  dev    │ ← │  dev    │
+│ (:4010 tsp) │   │(types)  │   │ (:3001) │   │ (:3000) │
+└─────────────┘   └─────────┘   └────▲────┘   └────┬────┘
+                                     │              │
+                                     └──────────────┘
+                                           │
+                                    ┌─────────────┐
+                                    │   Prism     │
+                                    │   (:4010)   │
+                                    └─────────────┘
+```
+
+**E2E Profile (`--profile e2e`):**
+```
+┌─────────────┐      ┌─────────────┐
+│  web-e2e    │─────▶│   api-e2e   │
+│  (nginx)    │      │   (:3001)   │
+│  (:3000)    │      │   SQLite    │
+└─────────────┘      └─────────────┘
+```
+
+**Production Profile (`--profile prod`):**
 ```
 ┌─────────────────────────────────────────────┐
-│              Nginx (Port 80)                │
-│  ┌──────────────┐      ┌──────────────────┐  │
-│  │ Static files │      │ Proxy /api/*     │  │
-│  │ (Vue build)  │──────│ → Node.js:3001   │  │
-│  └──────────────┘      └──────────────────┘  │
-└─────────────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────────┐
-│           NestJS API (Port 3001)            │
-│                                              │
-│  • Prisma ORM + SQLite                      │
-│  • Database: /app/api/data/prod.db          │
+│              Nginx (Port 7860)              │
+│  ┌──────────────┐      ┌──────────────────┐ │
+│  │ Static files │      │ Proxy /api/*     │ │
+│  │ (Vue build)  │──────│ → Node.js:3001   │ │
+│  └──────────────┘      └──────────────────┘ │
 └─────────────────────────────────────────────┘
 ```
 
 ### Important Notes
 
-- **Single container**: Both nginx (port 80) and Node.js (port 3001) run together
-- **SQLite persistence**: Mount volume at `/app/api/data` in Railway for database persistence
-- **Health check**: Railway checks `GET /api/owner` on port 80
+- **Unified compose file**: `docker-compose.yml` with profiles for dev/e2e/prod
+- **SQLite persistence**: Mount volume at `/data` (Hugging Face Spaces compatible)
+- **Health check**: `GET /api/owner` on port 7860
 - **Multi-stage build**: Optimized for production (see `Dockerfile`)
 
 ## Other Notes
