@@ -2,64 +2,34 @@
  * Database fixtures for E2E tests
  *
  * Provides utilities for seeding test data before tests.
- * Uses Prisma client directly from the backend for type safety.
- *
- * Note: We use raw SQL queries here to avoid importing @prisma/client
- * which would require building the backend first.
+ * Uses HTTP endpoint to reset database inside Docker container.
  */
 
-import { execSync } from 'child_process'
-import { readFileSync } from 'fs'
-import { join, dirname } from 'path'
-import { fileURLToPath } from 'url'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-
-// Database path (relative to api package)
-const DB_PATH = join(__dirname, '../../api/prisma/dev.db')
+const API_BASE_URL = 'http://localhost:3001';
 
 /**
- * Reset database to clean state using Prisma migrations
- */
-export async function resetDatabase(): Promise<void> {
-  console.log('🔄 Resetting database...')
-  try {
-    // Use Prisma CLI to reset and migrate
-    execSync('npx prisma migrate reset --force --skip-generate', {
-      cwd: join(__dirname, '../../api'),
-      stdio: 'pipe',
-      env: { ...process.env, DATABASE_URL: `file:./prisma/dev.db` },
-    })
-    console.log('✅ Database reset complete')
-  } catch (error) {
-    console.error('❌ Database reset failed:', error)
-    throw error
-  }
-}
-
-/**
- * Seed database with test data
- */
-export async function seedDatabase(): Promise<void> {
-  console.log('🌱 Seeding database...')
-  try {
-    execSync('npm run db:seed', {
-      cwd: join(__dirname, '../../api'),
-      stdio: 'pipe',
-    })
-    console.log('✅ Database seed complete')
-  } catch (error) {
-    console.error('❌ Database seed failed:', error)
-    throw error
-  }
-}
-
-/**
- * Setup clean database with seed data
+ * Reset and seed database via HTTP endpoint
+ * Calls POST /api/testing/reset in the api-e2e container
  */
 export async function setupTestDatabase(): Promise<void> {
-  await resetDatabase()
-  await seedDatabase()
+  console.log('🔄 Resetting database via HTTP...');
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/testing/reset`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Database reset failed: ${response.status} ${errorText}`);
+    }
+
+    const result = (await response.json()) as { ok: boolean; created: Record<string, number> };
+    console.log('✅ Database reset complete:', result.created);
+  } catch (error) {
+    console.error('❌ Database reset failed:', error);
+    throw error;
+  }
 }
 
 /**

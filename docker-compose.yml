@@ -107,6 +107,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=file:/data/test.db
+      - E2E_TESTING=true
     working_dir: /app/apps/api
     command: >
       sh -c "

@@ -24,18 +24,21 @@ jobs:
           # Build and start services with unified docker compose
           # --wait flag waits for healthchecks to pass
           docker compose --profile e2e up --build -d --wait
-          
+
           # Verify services are running
           docker compose ps
-          
+
           # Show logs if something went wrong
           docker compose logs api-e2e
+
+      - name: Fix permissions after Docker
+        run: sudo chown -R $USER:$USER .
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          # cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         working-directory: ./apps/e2e
