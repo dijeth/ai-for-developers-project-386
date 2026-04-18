@@ -54,7 +54,8 @@ test.describe('Happy Path - Complete Booking Flow', () => {
       // Wait for calendar to be ready
       await expect(page.locator('.calendar-legend')).toBeVisible({ timeout: 10000 })
 
-      selectedDate = getNextWeekday(new Date()) // Get next weekday for booking
+      // We need to get start of the next weekday working hours for API call to ensure we have available slots
+      selectedDate = createDateAtHour(getNextWeekday(new Date()), 9) 
 
       // Navigate to the correct month in calendar if needed
       const currentMonth = new Date().getMonth()
@@ -70,6 +71,12 @@ test.describe('Happy Path - Complete Booking Flow', () => {
 
       // Select the date in the calendar
       const dayOfMonth = selectedDate.getDate()
+      console.log(JSON.stringify({
+        selectedDate,
+        currentMonth,
+        targetMonth,
+        dayOfMonth
+      }))
       const dateCell = page.locator('.p-datepicker-calendar td span', {
         hasText: String(dayOfMonth)
       }).first()
