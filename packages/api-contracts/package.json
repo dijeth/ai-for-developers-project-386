@@ -1,10 +1,10 @@
 {
-  "name": "api-spec",
+  "name": "api-contracts",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsp compile .",
+    "compile": "tsp compile .",
     "watch": "tsp compile . --watch",
     "dev": "tsp compile . --watch"
   },

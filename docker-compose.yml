@@ -30,9 +30,9 @@ services:
     profiles: ["dev"]
     command: >
       sh -c "
-        npm run build -w api-spec &&
+        npm run compile -w api-contracts &&
         npm run generate:types -w web &&
-        npm run dev -w api-spec &
+        npm run watch -w api-contracts &
         npm run watch:types -w web &
         wait
       "
@@ -43,7 +43,7 @@ services:
           "CMD",
           "sh",
           "-c",
-          "[ -s /app/packages/contracts/openapi.yaml ] && [ -s /app/apps/web/src/types/generated/api-types.ts ]",
+          "[ -s /app/packages/api-contracts/openapi.yaml ] && [ -s /app/apps/web/src/types/generated/api-types.ts ]",
         ]
       interval: 2s
       timeout: 5s
@@ -97,7 +97,7 @@ services:
     ports:
       - "4010:4010"
     volumes:
-      - ./packages/contracts/openapi.yaml:/openapi.yaml:ro
+      - ./packages/api-contracts/openapi.yaml:/openapi.yaml:ro
     # -m false disables multiprocess mode to avoid Node.js 20 compatibility issues
     # -h 0.0.0.0 allows connections from outside the container (Docker port forwarding)
     command: proxy /openapi.yaml http://api-dev:3001 --errors -p 4010 -m false -h 0.0.0.0
@@ -110,7 +110,7 @@ services:
     develop:
       watch:
         - action: restart
-          path: ./packages/contracts/openapi.yaml
+          path: ./packages/api-contracts/openapi.yaml
 
   web-dev:
     <<: *api-base
