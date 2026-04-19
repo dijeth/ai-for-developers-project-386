@@ -34,8 +34,12 @@ else
     echo "WARNING: Database file is missing or too small ($DB_SIZE bytes)"
 fi
 
+# Generate nginx configuration from template
+echo "Generating nginx configuration..."
+envsubst '${PORT} ${API_PORT}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
+
 # Start backend in background
-echo "Starting backend API on port 3001..."
+echo "Starting backend API on port ${API_PORT}..."
 cd /app/apps/api
 node dist/src/main &
 API_PID=$!
@@ -51,13 +55,13 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
         echo "ERROR: Backend process died"
         exit 1
     fi
-    
+
     # Try to connect to health endpoint
-    if wget -q -O - http://127.0.0.1:3001/health > /dev/null 2>&1; then
+    if wget -q -O - http://127.0.0.1:${API_PORT}/health > /dev/null 2>&1; then
         echo "Backend is ready! (responded with HTTP 200)"
         break
     fi
-    
+
     RETRY_COUNT=$((RETRY_COUNT + 1))
     echo "Attempt $RETRY_COUNT/$MAX_RETRIES: Backend not ready yet, waiting..."
     sleep 1
@@ -71,6 +75,6 @@ fi
 
 echo "Backend started successfully (PID: $API_PID)"
 
-# Start nginx in foreground on port 7860 (Hugging Face Spaces standard port)
-echo "Starting nginx on port 7860..."
+# Start nginx in foreground on port ${PORT}
+echo "Starting nginx on port ${PORT}..."
 nginx -g 'daemon off;'

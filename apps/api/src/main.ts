@@ -28,7 +28,7 @@ async function bootstrap() {
   // Global request logging interceptor
   app.useGlobalInterceptors(new RequestLoggingInterceptor());
 
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
+  const port = process.env.API_PORT ? parseInt(process.env.API_PORT, 10) : 3001;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
 }

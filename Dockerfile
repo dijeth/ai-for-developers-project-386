@@ -8,8 +8,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY apps/api/package*.json ./apps/api/
 COPY apps/web/package*.json ./apps/web/
-COPY packages/api-spec/package*.json ./packages/api-spec/
-COPY packages/contracts/package*.json ./packages/contracts/
+COPY packages/api-contracts/package*.json ./packages/api-contracts/
 COPY packages/date-utils/package*.json ./packages/date-utils/
 COPY packages/date-utils/tsconfig.json ./packages/date-utils/
 
@@ -17,8 +16,7 @@ COPY packages/date-utils/tsconfig.json ./packages/date-utils/
 COPY apps/api/prisma ./apps/api/prisma
 
 # Create empty node_modules for packages to ensure reliability of next stages 
-RUN mkdir -p /app/packages/api-spec/node_modules
-RUN mkdir -p /app/packages/contracts/node_modules
+RUN mkdir -p /app/packages/api-contracts/node_modules
 RUN mkdir -p /app/packages/date-utils/node_modules
 
 # Install dependencies
@@ -28,14 +26,13 @@ RUN npm ci
 FROM node:20-alpine AS spec-builder
 
 WORKDIR /app
-COPY packages/api-spec ./packages/api-spec
-COPY packages/contracts ./packages/contracts
+COPY packages/api-contracts ./packages/api-contracts
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/api-spec/node_modules ./packages/api-spec/node_modules
+COPY --from=deps /app/packages/api-contracts/node_modules ./packages/api-contracts/node_modules
 COPY --from=deps /app/package*.json ./
 
 # Generate OpenAPI from TypeSpec
-RUN npm run build -w api-spec
+RUN npm run compile -w api-contracts
 
 # Stage 3: Build all applications
 FROM node:20-alpine AS builder
@@ -53,7 +50,7 @@ COPY --from=deps /app/apps/api/package*.json ./apps/api/
 COPY --from=deps /app/apps/web/package*.json ./apps/web/
 COPY --from=deps /app/packages/date-utils/package*.json ./packages/date-utils/
 
-COPY --from=spec-builder /app/packages/contracts ./packages/contracts
+COPY --from=spec-builder /app/packages/api-contracts ./packages/api-contracts
 
 # Build all packages and applications
 RUN npm run build -w @calendar/date-utils
@@ -73,8 +70,8 @@ EXPOSE 3000
 # Stage 5: Production image
 FROM nginx:alpine AS production
 
-# Install Node.js and timezone data for consistent date handling
-RUN apk add --no-cache nodejs tzdata
+# Install Node.js, timezone data and gettext for envsubst
+RUN apk add --no-cache nodejs tzdata gettext
 
 # Set timezone to UTC for consistent date parsing across environments
 ENV TZ=UTC
@@ -100,8 +97,8 @@ COPY --from=builder /app/apps/web/public/themes /usr/share/nginx/html/themes
 RUN mkdir -p /data && chmod 777 /data
 RUN ln -sf /data /app/apps/api/data
 
-# Copy nginx configuration
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx configuration template
+COPY docker/nginx.conf.template /etc/nginx/conf.d/default.conf.template
 
 # Copy startup script
 COPY docker/start.sh /app/start.sh
@@ -109,11 +106,12 @@ RUN chmod +x /app/start.sh
 
 # Environment variables
 ENV NODE_ENV=production
-ENV PORT=3001
+ENV PORT=7860
+ENV API_PORT=3001
 ENV DATABASE_URL="file:/data/prod.db"
 
-# Expose ports (7860 is Hugging Face Spaces standard port)
-EXPOSE 7860
+# Expose ports (PORT is Hugging Face Spaces standard port, configurable via env)
+EXPOSE ${PORT}
 
 # Start both backend and nginx
 CMD ["/app/start.sh"]

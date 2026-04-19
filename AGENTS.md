@@ -429,9 +429,29 @@ All environments use unified `docker-compose.yml` with profiles:
 - **Unified compose file**: `docker-compose.yml` with profiles for dev/e2e/prod
 - **SQLite persistence**: Mount volume at `/data` (Hugging Face Spaces compatible)
 - **Health checks**:
-  - Compose app health check uses backend `GET /health` on port 3001
+  - Compose app health check uses backend `GET /health` on port API_PORT
   - Startup readiness in `docker/start.sh` waits for `GET /api/owner`
 - **Multi-stage build**: Optimized for production (see `Dockerfile`)
+
+### Environment Variables (Production)
+
+The production container supports the following environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `7860` | External port for Nginx (Hugging Face Spaces standard) |
+| `API_PORT` | `3001` | Internal port for backend API (inside container) |
+| `DATABASE_URL` | `file:/data/prod.db` | SQLite database path |
+| `NODE_ENV` | `production` | Node.js environment |
+| `TZ` | `UTC` | Timezone for consistent date handling |
+
+**Hugging Face Spaces**: The platform automatically sets `PORT` environment variable (usually `7860`), so the application will work without additional configuration.
+
+**Local testing with custom port**:
+```bash
+# Run production container on port 8080 instead of 7860
+docker run -e PORT=8080 -e API_PORT=3001 -p 8080:8080 calendar-app
+```
 
 ## Other Notes
 
