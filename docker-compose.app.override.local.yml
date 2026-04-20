@@ -6,7 +6,7 @@
 #      npm run build -w api
 #      npm run build -w web
 #   2. Start E2E services with override:
-#      docker compose -f docker-compose.yml -f docker-compose.override.local.yml --profile e2e up -d
+#      docker compose -f docker-compose.app.yml -f docker-compose.app.override.local.yml --profile e2e up -d
 #
 # This mounts pre-built code from host, allowing:
 # - Changes without docker rebuild

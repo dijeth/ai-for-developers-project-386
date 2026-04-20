@@ -33,6 +33,7 @@ TypeSpec → OpenAPI → Prism proxy → NestJS backend → Vue frontend
 ```
 
 Monorepo structure:
+
 - `apps/api` — NestJS backend (port 3001)
 - `apps/web` — Vue 3 frontend (port 3000)
 - `apps/e2e` — Playwright tests

@@ -27,7 +27,7 @@ npm run docker:clean     # Stop all containers and remove volumes (clears DB)
 
 ## Compose Profiles
 
-All environments use a single compose file: docker-compose.yml.
+All environments use a single compose file: docker-compose.app.yml.
 
 | Profile | Services                                                 | Purpose                                   |
 | ------- | -------------------------------------------------------- | ----------------------------------------- |
@@ -44,7 +44,7 @@ All environments use a single compose file: docker-compose.yml.
 npm run dev
 
 # Stop
-docker compose --profile dev down
+docker compose -f docker-compose.app.yml --profile dev down
 ```
 
 ### Architecture
@@ -81,7 +81,7 @@ npm run e2e
 npm run e2e:ui
 
 # Stop
-docker compose --profile e2e down -v
+docker compose -f docker-compose.app.yml --profile e2e down -v
 ```
 
 ### Architecture
@@ -104,7 +104,7 @@ api-e2e (:3001)
 
 ### Local E2E Debug Mode
 
-Use docker-compose.override.local.yml to mount host-built artifacts:
+Use docker-compose.app.override.local.yml to mount host-built artifacts:
 
 ```bash
 # Build host artifacts first
@@ -125,7 +125,7 @@ In local debug mode:
 
 ### Runtime Model
 
-Single container image from Dockerfile target production:
+Single container image from Dockerfile:
 
 - Nginx serves frontend on port 7860.
 - Node.js runs NestJS API on port 3001 inside the same container.
@@ -146,18 +146,17 @@ npm run start:down
 ## Dockerfile Stages
 
 ```text
-deps        -> install workspace dependencies
-spec-builder-> compile TypeSpec to OpenAPI
-builder     -> build shared package + api + web
-e2e-web     -> nginx image with built web assets for e2e
-production  -> nginx + node runtime image for production
+deps       -> install workspace dependencies
+build      -> compile contracts + build shared package + api + web
+production -> nginx + node runtime image for production
 ```
 
 ## Key Files
 
-- docker-compose.yml
-- docker-compose.override.local.yml
+- docker-compose.app.yml
+- docker-compose.app.override.local.yml
 - Dockerfile
+- Dockerfile.app
 - docker/nginx.conf
 - docker/nginx-e2e.conf
 - docker/start.sh
@@ -167,27 +166,27 @@ production  -> nginx + node runtime image for production
 ### Validate compose config
 
 ```bash
-docker compose --profile dev config
-docker compose --profile e2e config
-docker compose -f docker-compose.yml -f docker-compose.override.local.yml --profile e2e config
+docker compose -f docker-compose.app.yml --profile dev config
+docker compose -f docker-compose.app.yml --profile e2e config
+docker compose -f docker-compose.app.yml -f docker-compose.app.override.local.yml --profile e2e config
 ```
 
 ### Inspect logs
 
 ```bash
-docker compose logs -f contracts-watcher
-docker compose logs -f api-dev
-docker compose logs -f prism
-docker compose logs -f web-dev
-docker compose logs -f api-e2e
-docker compose logs -f web-e2e
+docker compose -f docker-compose.app.yml logs -f contracts-watcher
+docker compose -f docker-compose.app.yml logs -f api-dev
+docker compose -f docker-compose.app.yml logs -f prism
+docker compose -f docker-compose.app.yml logs -f web-dev
+docker compose -f docker-compose.app.yml logs -f api-e2e
+docker compose -f docker-compose.app.yml logs -f web-e2e
 ```
 
 ### Full reset
 
 ```bash
-docker compose down -v
-docker compose --profile dev up --build
+docker compose -f docker-compose.app.yml down -v
+docker compose -f docker-compose.app.yml --profile dev up --build
 ```
 
 ## Security Notes

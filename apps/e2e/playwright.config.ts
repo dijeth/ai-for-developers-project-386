@@ -1,10 +1,10 @@
-import { defineConfig, devices } from '@playwright/test'
-import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import { defineConfig, devices } from "@playwright/test";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-const rootDir = join(__dirname, '..', '..')
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const rootDir = join(__dirname, "..", "..");
 
 /**
  * Playwright configuration for E2E tests
@@ -12,8 +12,8 @@ const rootDir = join(__dirname, '..', '..')
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-  testDir: './tests',
-  testMatch: '**/*.spec.ts',
+  testDir: "./tests",
+  testMatch: "**/*.spec.ts",
 
   /* Run tests in files in parallel */
   fullyParallel: false,
@@ -28,21 +28,21 @@ export default defineConfig({
   workers: process.env.CI ? 1 : 1,
 
   /* Reporter to use */
-  reporter: [['html', { open: 'never' }], ['list']],
+  reporter: [["html", { open: "never" }], ["list"]],
 
   /* Shared settings for all the projects below */
   use: {
     /* Base URL to use in actions like `await page.goto('/')` */
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: "http://127.0.0.1:3000",
 
     /* Collect trace when retrying the failed test */
-    trace: 'on-first-retry',
+    trace: "on-first-retry",
 
     /* Screenshot on failure */
-    screenshot: 'only-on-failure',
+    screenshot: "only-on-failure",
 
     /* Video recording */
-    video: 'on-first-retry',
+    video: "on-first-retry",
 
     /* Action timeout for slow environments */
     actionTimeout: 30000,
@@ -51,15 +51,15 @@ export default defineConfig({
   /* Configure projects for major browsers - chromium only for speed */
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
 
   /*
    * Web server configuration:
    *
-   * Servers are managed externally via Docker compose (see root docker-compose.yml).
+   * Servers are managed externally via Docker compose (see root docker-compose.app.yml).
    * Playwright expects services to be already running.
    *
    * Usage:
@@ -67,11 +67,11 @@ export default defineConfig({
    *   npm run e2e:ui   # Start E2E services and run tests with UI
    *
    * Or manually:
-   *   docker compose --profile e2e up --build -d --wait
+   *   docker compose -f docker-compose.app.yml --profile e2e up --build -d --wait
    *   cd apps/e2e && npx playwright test
    *
    * Docker compose handles proper healthchecks (waits for HTTP 200),
    * unlike Playwright's webServer which accepts 4xx status codes.
    */
   webServer: undefined,
-})
+});
